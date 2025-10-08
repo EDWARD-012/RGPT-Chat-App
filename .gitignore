@@ -1,0 +1,20 @@
+# Python / Django
+venv/
+__pycache__/
+*.pyc
+db.sqlite3
+.env
+
+# Node.js / Vite
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.env
+/frontend/.env.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE settings
+.vscode/
+.idea/

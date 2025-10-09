@@ -163,6 +163,8 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+
 REST_AUTH = {
     'USER_DETAILS_SERIALIZER': 'api.serializers.UserSerializer',
 }

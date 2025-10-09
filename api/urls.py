@@ -3,13 +3,14 @@ from .views import (
     ChatSessionListCreateView,
     ChatSessionDetailView,
     MessageListCreateView,
-    GoogleLoginView
+    GoogleLoginView,
+    debug_instruction_view
 )
-from .views import create_chat
 
 urlpatterns = [
 
     path('auth/google/', GoogleLoginView.as_view(), name='google-login'),
+    path('debug-instruction/', debug_instruction_view, name='debug-instruction'),
 
     # /api/chats/ -> List user's chats (GET) or create a new chat (POST)
     path('chats/', ChatSessionListCreateView.as_view(), name='chat-session-list-create'),
@@ -19,7 +20,8 @@ urlpatterns = [
 
     # /api/chats/<session_id>/messages/ -> List messages in a chat (GET) or add a new message (POST)
     path('chats/<int:session_pk>/messages/', MessageListCreateView.as_view(), name='message-list-create'),
+    
 
-    path('chats/new/', create_chat, name='create-chat'),
+    # path('chats/new/', create_chat, name='create-chat'),
 
 ]

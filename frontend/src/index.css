@@ -14,3 +14,12 @@
 .custom-scroll::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+html {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark {
+  background-color: #2a2c30;
+  color: #f1f5f9;
+}

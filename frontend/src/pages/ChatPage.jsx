@@ -70,7 +70,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[90vh] overflow-hidden">
       {/* SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 bg-gray-100 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 p-4">
         <h2 className="text-xl font-semibold mb-4 text-gray-800 dark:text-gray-200">Chats</h2>
@@ -85,9 +85,7 @@ export default function ChatPage() {
       {/* MAIN CHAT AREA */}
       <div className="flex flex-col flex-1 bg-white dark:bg-gray-950">
         {/* NAVBAR */}
-        <header className="p-4 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{chatTitle}</h1>
-        </header>
+        
 
         {/* CHAT MESSAGES */}
         <main className="flex-1 overflow-y-auto p-6">

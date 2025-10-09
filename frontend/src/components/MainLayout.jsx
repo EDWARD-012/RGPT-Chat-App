@@ -1,4 +1,3 @@
-// src/components/MainLayout.jsx
 import { Outlet, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AppSidebar } from "./AppSidebar.jsx";
@@ -16,8 +15,7 @@ export default function MainLayout() {
     api.get('/chats/')
       .then(res => {
         setAllChats(res.data);
-        const grouped = groupChatsByDate(res.data);
-        setChatGroups(grouped);
+        setChatGroups(groupChatsByDate(res.data));
       })
       .catch(err => console.error("Error fetching chat sessions:", err));
   };
@@ -43,31 +41,32 @@ export default function MainLayout() {
     const chatToPin = allChats.find(c => c.id === chatId);
     if (!chatToPin) return;
     try {
-      await api.patch(`/chats/${chatId}/`, { pinned: !chatToToPin.pinned });
+      await api.patch(`/chats/${chatId}/`, { pinned: !chatToPin.pinned });
       fetchChatSessions();
     } catch (error) { console.error("Error pinning chat:", error); }
   };
 
   return (
-    <div className="flex h-screen bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
-      {isSidebarOpen && (
-        <AppSidebar 
-          allChats={allChats}
-          chatGroups={chatGroups} 
-          handleNewChat={handleNewChat} 
-          onRenameChat={handleRenameChat}
-          onPinChat={handlePinChat}
-        />
-      )}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Navbar 
-          isSidebarOpen={isSidebarOpen} 
-          setIsSidebarOpen={setIsSidebarOpen} 
-        />
-        <div className="flex-1 overflow-y-auto">
-          <Outlet />
+    <div className="flex bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-hidden">
+        {isSidebarOpen && (
+            <AppSidebar
+            allChats={allChats}
+            chatGroups={chatGroups}
+            handleNewChat={handleNewChat}
+            onRenameChat={handleRenameChat}
+            onPinChat={handlePinChat}
+            />
+        )}
+
+        <div className="flex-1 flex flex-col min-h-0">
+            <Navbar
+            isSidebarOpen={isSidebarOpen}
+            setIsSidebarOpen={setIsSidebarOpen}
+            />
+            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
+            <Outlet />
+            </div>
         </div>
-      </div>
-    </div>
+        </div>
   );
 }

@@ -155,3 +155,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
 
+REST_AUTH = {
+    'USER_DETAILS_SERIALIZER': 'api.serializers.UserSerializer',
+}
+

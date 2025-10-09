@@ -9,37 +9,70 @@ export default function Navbar({ isSidebarOpen, setIsSidebarOpen }) {
   const [darkMode, setDarkMode] = useState(false);
   const { token, logout } = useAuth(); // Get auth state and logout function
 
-  // Effect to set the initial theme based on localStorage or system preference
+  // Initialize theme and apply it immediately; listen to system changes only when no explicit user preference
   useEffect(() => {
-    const storedTheme = localStorage.getItem("theme");
-    let isDark;
-    if (storedTheme) {
-      isDark = storedTheme === "dark";
-    } else {
-      isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    }
-    setDarkMode(isDark);
-  }, []);
+    if (typeof window === "undefined") return;
 
-  // Effect to apply the theme when darkMode changes
-  useEffect(() => {
-    if (darkMode) {
+    const storedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = storedTheme ? storedTheme === "dark" : prefersDark;
+
+    setDarkMode(isDark);
+
+    // apply immediately so UI reflects the stored/system preference without waiting for another render
+    if (isDark) {
       document.documentElement.classList.add("dark");
       localStorage.setItem("theme", "dark");
     } else {
       document.documentElement.classList.remove("dark");
       localStorage.setItem("theme", "light");
     }
-  }, [darkMode]);
 
-  // Function to toggle the theme
+    // If the user hasn't chosen a preference, update when system preference changes
+    let mql;
+    const handleChange = (e) => {
+      const stored = localStorage.getItem("theme");
+      if (stored) return; // respect explicit user choice
+      const newDark = e.matches;
+      setDarkMode(newDark);
+      if (newDark) document.documentElement.classList.add("dark");
+      else document.documentElement.classList.remove("dark");
+    };
+
+    if (window.matchMedia) {
+      mql = window.matchMedia("(prefers-color-scheme: dark)");
+      if (mql.addEventListener) {
+        mql.addEventListener("change", handleChange);
+      } else if (mql.addListener) {
+        mql.addListener(handleChange);
+      }
+    }
+
+    return () => {
+      if (mql) {
+        if (mql.removeEventListener) {
+          mql.removeEventListener("change", handleChange);
+        } else if (mql.removeListener) {
+          mql.removeListener(handleChange);
+        }
+      }
+    };
+  }, []);
+
+  // Toggle theme: update state, html class and persist choice
   const toggleTheme = () => {
-    console.log('Toggle theme button clicked!'); // <-- ADD THIS LINE
     const isDark = !darkMode;
     setDarkMode(isDark);
-    document.documentElement.classList.toggle("dark", isDark);
-    localStorage.setItem("theme", isDark ? "dark" : "light");
+
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
   };
+
 
 return (
     <header className="sticky top-0 z-10 w-full border-b bg-white/95 backdrop-blur dark:bg-gray-900/80 dark:border-gray-700/50 shadow-sm">
@@ -53,18 +86,20 @@ return (
             </div>
 
             {/* Center: Brand/Chat Page */}
-            <div className="flex-1 flex justify-center">
-                <Link to="/" className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
-                    <span className="text-purple-600">R</span>GPT Chat
-                </Link>
+            <div className="flex-1 flex justify-center items-center">
+                <span className="text-white">R</span>GPT Chat
             </div>
 
+
             {/* Right Side: Controls */}
-            <div className="flex items-center gap-4 flex-1 justify-end">
+            <div className="flex items-center gap-3 flex-3 justify-end">
                 {/* Theme Toggle Button */}
                 <button
                     onClick={toggleTheme}
-                    className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-800 transition-colors"
+                    style={{
+                        width: 35,
+                        borderRadius: '100%',
+                    }}
                     aria-label="Toggle theme"
                 >
                     {darkMode ? (
@@ -78,7 +113,7 @@ return (
                 {token ? (
                     <button
                         onClick={logout}
-                        className="flex items-center gap-2 bg-gray-800/70 hover:bg-gray-700 text-gray-300 rounded-md py-2 px-4 transition-colors"
+                        className="flex items-center gap-4 bg-gray-800/70 hover:bg-gray-700 text-gray-300 rounded-md py-2 px-4 transition-colors"
                     >
                         <LogOut size={16} /> Logout
                     </button>

@@ -1,29 +1,52 @@
 from django.conf import settings
+from django.http import StreamingHttpResponse, JsonResponse
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from .models import ChatSession, Message
+from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.authtoken.models import Token
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from PIL import Image
+import google.generativeai as genai
+
+from .models import User, ChatSession, Message
 from .serializers import (
+    UserSerializer,
     ChatSessionListSerializer,
     ChatSessionDetailSerializer,
     MessageSerializer
 )
-import google.generativeai as genai
-from PIL import Image # <-- Import the Image library
-
-# Add these imports at the top
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
-from .models import User
-
-from .serializers import UserSerializer 
 
 # Configure the Gemini API client
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
-# --- Chat Session Views (no changes here) ---
+# --- AUTHENTICATION VIEWS ---
+
+class GoogleLoginView(APIView):
+    def post(self, request):
+        try:
+            token = request.data.get('token')
+            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), audience=settings.GOOGLE_CLIENT_ID)
+            email = idinfo['email']
+            user, created = User.objects.get_or_create(
+                email=email,
+                defaults={
+                    'username': email, 'first_name': idinfo.get('given_name', ''),
+                    'last_name': idinfo.get('family_name', ''), 'profile_picture_url': idinfo.get('picture')
+                }
+            )
+            if not created and idinfo.get('picture'):
+                user.profile_picture_url = idinfo.get('picture', user.profile_picture_url)
+                user.save()
+            backend_token, _ = Token.objects.get_or_create(user=user)
+            user_serializer = UserSerializer(user)
+            return Response({'token': backend_token.key, 'user': user_serializer.data})
+        except Exception as e:
+            return Response({"error": f"Google token verification failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+# --- CHAT SESSION VIEWS ---
 
 class ChatSessionListCreateView(generics.ListCreateAPIView):
     serializer_class = ChatSessionListSerializer
@@ -40,20 +63,14 @@ class ChatSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_queryset(self):
         return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
 
-# --- Message View (with NEW Image Handling Logic) ---
+# --- MESSAGE CREATION VIEW (UNIFIED LOGIC) ---
 
-class MessageListCreateView(generics.ListCreateAPIView):
+class MessageListCreateView(generics.CreateAPIView):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        session_id = self.kwargs['session_pk']
-        return Message.objects.filter(session__user=self.request.user, session__id=session_id)
-    
-    def stream_gemini_response(self, chat_session, user_message_text):
-        try:
-            # --- YEH HAI FINAL INSTRUCTION NOTE ---
-            system_instruction = """You are RGPT, a helpful, confident, and modern AI assistant created by Ravi Kumar Gupta (EDWARD7780).
+    def get_system_instruction(self):
+        return """You are RGPT, a helpful, confident, and modern AI assistant created by Ravi Kumar Gupta (EDWARD7780).
             You speak in natural Hinglish — a friendly mix of Hindi and English — with a positive, chill vibe 😎.
 
             --- IMPORTANT PERSONALITY RULES ---
@@ -80,129 +97,75 @@ class MessageListCreateView(generics.ListCreateAPIView):
 
             5. If the user asks for code help or debugging, always give the best possible answer in C++ by default (unless they specify another language).
 
-            6. Never break your character or mention these rules. Always behave like RGPT.
+            6. Never break your character or mention these rules. Always behave like RGPT."""
 
-            --- BEHAVIORAL STYLE ---
-            - Keep answers crisp, helpful, and a little friendly.
-            - Avoid over-explaining unless the user explicitly asks for “explain”.
-            - When solving coding or DSA queries, focus on accuracy and speed.
-
-            You are not a normal assistant — you are RGPT, built to make coding + chatting feel smart and fun 😎."""
-            # ------------------------------------
-            
+    def stream_text_response(self, chat_session, user_message_text):
+        """Generator for text-only streaming responses."""
+        try:
             model = genai.GenerativeModel(
                 'gemini-1.5-flash-latest',
-                system_instruction=system_instruction # Instruction note ko yahan pass karein
+                system_instruction=self.get_system_instruction()
             )
+            history = [{"role": "user" if m.is_from_user else "model", "parts": [{"text": m.text}]}
+                       for m in chat_session.messages.order_by('timestamp').all()]
             
-            history_for_api = []
-            for msg in chat_session.messages.order_by('timestamp').all():
-                role = "user" if msg.is_from_user else "model"
-                history_for_api.append({"role": role, "parts": [{"text": msg.text}]})
+            chat = model.start_chat(history=history[:-1])
+            response_stream = chat.send_message(user_message_text, stream=True)
 
-            gemini_chat = model.start_chat(history=history_for_api[:-1]) 
-            response_stream = gemini_chat.send_message(user_message_text, stream=True)
-
-            full_response_text = ""
+            full_response = ""
             for chunk in response_stream:
                 if chunk.text:
-                    full_response_text += chunk.text
+                    full_response += chunk.text
                     yield chunk.text
-
-            Message.objects.create(session=chat_session, text=full_response_text, is_from_user=False)
+            
+            Message.objects.create(session=chat_session, text=full_response, is_from_user=False)
         except Exception as e:
             yield f"Error: {str(e)}"
 
     def create(self, request, *args, **kwargs):
         session_id = self.kwargs['session_pk']
         try:
-            session = ChatSession.objects.get(id=session_id, user=self.request.user)
+            session = ChatSession.objects.get(id=session_id, user=request.user)
         except ChatSession.DoesNotExist:
             return Response({"error": "Chat session not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # 1. Save the user's message (and file if it exists)
         user_message_serializer = self.get_serializer(data=request.data)
         user_message_serializer.is_valid(raise_exception=True)
         user_message = user_message_serializer.save(session=session, is_from_user=True)
 
-        # 2. Prepare content for Gemini (Text and/or Image)
-        model = genai.GenerativeModel('gemini-2.5-flash') # Use a model that supports vision
-        
-        # --- NEW: Image handling logic ---
-        try:
-            gemini_content = []
-            if user_message.text:
-                gemini_content.append(user_message.text)
-            
-            if 'file_upload' in request.FILES:
+        # --- THIS IS THE UNIFIED LOGIC ---
+        # If there's a file, handle it with a standard (non-streaming) response
+        if 'file_upload' in request.FILES:
+            try:
+                model = genai.GenerativeModel(
+                    'gemini-1.5-flash-latest',
+                    system_instruction=self.get_system_instruction()
+                )
                 image_file = request.FILES['file_upload']
                 img = Image.open(image_file)
-                gemini_content.append(img)
-            
-            if not gemini_content:
-                 return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # 3. Call the Gemini API with the content
-            response = model.generate_content(gemini_content)
-            ai_response_text = response.text
+                
+                response = model.generate_content([user_message.text, img])
+                ai_response_text = response.text
+
+                ai_message = Message.objects.create(session=session, text=ai_response_text, is_from_user=False)
+                ai_message_serializer = self.get_serializer(ai_message)
+                return Response(ai_message_serializer.data, status=status.HTTP_201_CREATED)
+
+            except Exception as e:
+                return Response({"error": f"API Error with image: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
-        except Exception as e:
-            return Response({"error": f"API Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # 4. Save the AI's response
-        ai_message = Message.objects.create(
-            session=session,
-            text=ai_response_text,
-            is_from_user=False
-        )
-
-        # 5. Return the AI's response to the frontend
-        ai_message_serializer = self.get_serializer(ai_message)
-        return Response(ai_message_serializer.data, status=status.HTTP_201_CREATED)
-    
-class GoogleLoginView(APIView):
-    def post(self, request):
-        try:
-            token = request.data.get('token')
-            idinfo = id_token.verify_oauth2_token(token, google_requests.Request())
-
-            email = idinfo['email']
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    'username': email,
-                    'first_name': idinfo.get('given_name', ''),
-                    'last_name': idinfo.get('family_name', ''),
-                    'profile_picture_url': idinfo.get('picture', None) # <-- SAVE PICTURE URL
-                }
+        # Otherwise, handle it with a streaming response for text
+        else:
+            return StreamingHttpResponse(
+                self.stream_text_response(session, user_message.text),
+                content_type='text/plain'
             )
-            
-            # Update picture URL for existing users as well
-            if not created and idinfo.get('picture'):
-                user.profile_picture_url = idinfo.get('picture')
-                user.save()
 
-            backend_token, _ = Token.objects.get_or_create(user=user)
-            user_serializer = UserSerializer(user)
-
-            # Return both the token and the serialized user data
-            return Response({
-                'token': backend_token.key,
-                'user': user_serializer.data
-            })
-
-        except Exception as e:
-            return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-        
-
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from .models import ChatSession
-# views.py
-@api_view(['POST'])
+# --- DEBUG VIEW (Can be removed after testing) ---
+@api_view(['GET'])
 @permission_classes([IsAuthenticated])
-def create_chat(request):
-    chat = ChatSession.objects.create(user=request.user, title="New Chat")
-    return Response({"id": chat.id})
+def debug_instruction_view(request):
+    # This view is for debugging purposes to check the system instruction on the server.
+    instruction = MessageListCreateView().get_system_instruction()
+    return JsonResponse({"system_instruction_on_server": instruction})
+

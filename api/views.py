@@ -138,7 +138,7 @@ class MessageListCreateView(generics.CreateAPIView):
         if 'file_upload' in request.FILES:
             try:
                 model = genai.GenerativeModel(
-                    'gemini-1.5-flash-latest',
+                    'gemini-2.5-flash',
                     system_instruction=self.get_system_instruction()
                 )
                 image_file = request.FILES['file_upload']

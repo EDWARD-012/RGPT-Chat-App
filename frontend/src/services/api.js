@@ -2,7 +2,8 @@ import axios from 'axios';
 
 // Create an instance of axios
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api/', // Your Django backend URL
+  // Use the new, live backend URL
+  baseURL: 'https://rgpt-backend-b6qe.onrender.com/api/', 
 });
 
 // Add a request interceptor to include the auth token

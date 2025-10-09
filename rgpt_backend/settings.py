@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-vpx13esz1r921-!k=t_%&2x$dptvjw!+1wvlb!si*rci06^#8j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS = ['127.0.0.1','https://rgpt-backend-b6qe.onrender.com']
 
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_URL')
 if RENDER_EXTERNAL_HOSTNAME:

@@ -69,6 +69,11 @@ class MessageListCreateView(generics.CreateAPIView):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        """This method handles the GET request to list messages."""
+        session_id = self.kwargs['session_pk']
+        return Message.objects.filter(session__user=self.request.user, session__id=session_id)
+
     def get_system_instruction(self):
         return """You are RGPT, a helpful, confident, and modern AI assistant created by Ravi Kumar Gupta (EDWARD7780).
             You speak in natural Hinglish — a friendly mix of Hindi and English — with a positive, chill vibe 😎.
@@ -103,7 +108,7 @@ class MessageListCreateView(generics.CreateAPIView):
         """Generator for text-only streaming responses."""
         try:
             model = genai.GenerativeModel(
-                'gemini-1.5-flash-latest',
+                'gemini-flash-latest',
                 system_instruction=self.get_system_instruction()
             )
             history = [{"role": "user" if m.is_from_user else "model", "parts": [{"text": m.text}]}
@@ -138,7 +143,7 @@ class MessageListCreateView(generics.CreateAPIView):
         if 'file_upload' in request.FILES:
             try:
                 model = genai.GenerativeModel(
-                    'gemini-2.5-flash',
+                    'gemini-pro-latest',
                     system_instruction=self.get_system_instruction()
                 )
                 image_file = request.FILES['file_upload']

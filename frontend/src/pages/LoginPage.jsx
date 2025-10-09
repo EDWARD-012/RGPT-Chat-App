@@ -1,6 +1,7 @@
 import { useEffect } from 'react'; // <-- Import useEffect
 import { GoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
+import api from '../services/api';
 
 export default function LoginPage() {
 
@@ -16,8 +17,8 @@ export default function LoginPage() {
   const handleLoginSuccess = async (credentialResponse) => {
     try {
       // Send the token to your Django backend
-      const response = await axios.post('http://127.0.0.1:8000/api/auth/google/', {
-        token: credentialResponse.credential
+      const response = await api.post('auth/google/', {
+        token: credentialResponse.credential,
       });
       
       const backendToken = response.data.token;

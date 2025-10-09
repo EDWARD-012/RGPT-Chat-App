@@ -27,11 +27,22 @@ SECRET_KEY = 'django-insecure-vpx13esz1r921-!k=t_%&2x$dptvjw!+1wvlb!si*rci06^#8j
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = ['127.0.0.1','https://rgpt-backend-b6qe.onrender.com']
-
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "rgpt-backend-b6qe.onrender.com",
+    "rgpt-chat-app.vercel.app",
+    "localhost",
+]
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_URL')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME.split("://")[1])
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://rgpt-chat-app.vercel.app",
+    "https://rgpt-backend-b6qe.onrender.com",
+    "http://localhost:5173",
+]
+
 
 
 # Application definition

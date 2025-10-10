@@ -141,7 +141,7 @@ class MessageListCreateView(generics.CreateAPIView):
 
         try:
             model = genai.GenerativeModel(
-                'gemini-pro-vision', # Vision model is best for image analysis
+                'gemini-2.5-pro',
                 system_instruction=self.get_system_instruction()
             )
 

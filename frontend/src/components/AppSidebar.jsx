@@ -22,13 +22,14 @@ const ChatList = ({ chats, onEdit, onPin, editingId, editValue, setEditValue, on
         <NavLink
           to={`/chats/${chat.id}`}
           className={({ isActive }) =>
-            `flex items-center gap-3 p-2 rounded-md transition-colors text-sm truncate flex-1 ${
+            `no-underline text-inherit flex items-center gap-3 p-2 rounded-md transition-colors text-sm flex-1 ${
               isActive
-                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
+                ? 'bg-gray-200 dark:bg-gray-700'
+                : 'hover:bg-gray-200 dark:hover:bg-gray-800'
             }`
           }
         >
+          
           <MessageSquare size={16} className="flex-shrink-0" />
           {editingId === chat.id ? (
             <input
@@ -42,7 +43,10 @@ const ChatList = ({ chats, onEdit, onPin, editingId, editValue, setEditValue, on
               }}
             />
           ) : (
-            <span className="truncate">{chat.title}</span>
+            <span className="truncate text-black dark:text-white">
+              {chat.title || 'New Chat'}
+            </span>
+
           )}
         </NavLink>
         <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -110,17 +114,20 @@ export function AppSidebar({
   return (
     <div className="w-72 bg-gray-50 dark:bg-gray-900/80 backdrop-blur-md border-r border-gray-200 dark:border-gray-700/50 flex flex-col h-[97vh]">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700/50 flex items-center gap-2">
-        <Logo className="w-8 h-8 text-purple-600" />
+        <Logo className="w-8 h-8 text-gray-800 dark:text-gray-200" />
         <h1 className="text-lg font-semibold text-gray-900 dark:text-white">RGPT</h1>
       </div>
 
       <div className="p-4">
-        <button
-          onClick={handleNewChat}
-          className="flex items-center justify-center gap-2 w-full bg-gradient-to-r from-purple-600 to-blue-500 hover:opacity-90 text-white font-medium py-2 rounded-lg transition"
-        >
-          <Plus size={10} /> New Chat
-        </button>
+      <button
+        onClick={handleNewChat}
+        className="flex items-center justify-center gap-2 w-full 
+                  bg-gradient-to-r from-purple-600 to-blue-500 
+                  hover:opacity-90 text-black dark:text-white 
+                  font-medium py-2 rounded-lg transition"
+      >
+        New Chat
+      </button>
       </div>
 
       <div className="px-4 pb-2">

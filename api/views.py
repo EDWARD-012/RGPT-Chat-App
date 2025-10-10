@@ -61,11 +61,7 @@ class ChatSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'pk'
     def get_queryset(self):
-        session_id = self.kwargs['session_pk']
-        return Message.objects.filter(
-            session__user=self.request.user, 
-            session__id=session_id
-        ).order_by('timestamp')
+        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
 
 # --- MESSAGE CREATION VIEW (UNIFIED LOGIC) ---
 

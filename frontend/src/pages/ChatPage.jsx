@@ -7,6 +7,7 @@ import TextareaAutosize from "react-textarea-autosize";
 import TypingLoader from "../components/TypingLoader";
 import MessageBubble from "../components/MessageBubble";
 import logo from "../assets/logo.svg";
+import { vw } from "framer-motion";
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -52,11 +53,14 @@ export default function ChatPage() {
     setInput("");
     setFile(null);
     setIsTyping(true);
+    setIsLoading(true);
 
     try {
       const formData = new FormData();
       formData.append("text", currentInput);
-      if (file) formData.append("file", file);
+      if (currentFile) {
+        formData.append('file_upload', currentFile);
+      }
 
       const res = await api.post(`/chats/${chatId}/messages/`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -98,7 +102,7 @@ export default function ChatPage() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {isLoading && (
-              <p className="text-center text-gray-500">Loading chat...</p>
+              <p className="text-center text-gray-600 dark:text-gray-300">Loading chat...</p>
             )}
 
             {!isLoading && messages.length === 0 && (

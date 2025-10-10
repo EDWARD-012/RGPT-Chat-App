@@ -156,6 +156,39 @@ class MessageListCreateView(generics.CreateAPIView):
             
             if not gemini_content:
                 return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # --- YEH HAI FINAL MEMORY FIX ---
+            # 1. Database se saari purani messages fetch karo
+            history_messages = session.messages.order_by('timestamp').all()
+
+            # 2. Unhe Gemini ke format mein convert karo (Text + Image)
+            history_for_api = []
+            for msg in history_messages:
+                role = "user" if msg.is_from_user else "model"
+                parts = []
+                
+                # Text ko hamesha add karo
+                if msg.text:
+                    parts.append(msg.text)
+                
+                # Agar message ke saath file hai, toh us image ko bhi parts mein add karo
+                if msg.file_upload:
+                    try:
+                        # File path se image ko open karo
+                        img = Image.open(msg.file_upload.path)
+                        parts.append(img)
+                    except FileNotFoundError:
+                        print(f"Warning: File not found at {msg.file_upload.path}. Skipping image.")
+                    except Exception as e:
+                        print(f"Warning: Could not process image {msg.file_upload.path}. Error: {e}")
+
+                if parts: # Agar parts khaali nahi hain, tabhi history mein add karo
+                    history_for_api.append({'role': role, 'parts': parts})
+            # --------------------------------
+
+            # 3. Poori history (text + images) ke saath AI ko call karo
+            response = model.generate_content(history_for_api)
+            ai_response_text = response.text
 
             # Generate response from AI
             response = model.generate_content(gemini_content)

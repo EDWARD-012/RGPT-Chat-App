@@ -44,20 +44,34 @@ export default function MessageBubble({ message }) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex gap-4 ${isUser ? "justify-end" : "justify-start"} mb-8`} // <-- Added margin-bottom for spacing
+      className={`flex gap-4 ${isUser ? "justify-end" : "justify-start"}`}
     >
       <div className={`flex items-start gap-4 ${isUser ? "flex-row-reverse" : ""}`}>
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center${isUser ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-300'}`}>
-          
+        
+        <div
+          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center self-start ${
+            isUser
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-300'
+          }`}
+        >
+          {/* Avatar content */}
         </div>
-        <div className={`prose prose-invert max-w-2xl text-gray-300 p-4 rounded-xl ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
-          <ReactMarkdown
-            components={{ code: CodeBlock }}
-          >
+        
+        <div
+          className={`prose prose-invert max-w-2xl p-4 rounded-xl ${
+            isUser
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-700 text-gray-300'
+          } inline-block`} // <-- Tailwind-only fix
+        >
+          <ReactMarkdown components={{ code: CodeBlock }}>
             {message.text}
           </ReactMarkdown>
         </div>
+        
       </div>
     </motion.div>
+
   );
 }

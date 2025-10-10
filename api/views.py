@@ -127,83 +127,76 @@ class MessageListCreateView(generics.CreateAPIView):
         except Exception as e:
             yield f"Error: {str(e)}"
 
-    def create(self, request, *args, **kwargs):
-        session_id = self.kwargs['session_pk']
+def create(self, request, *args, **kwargs):
+    session_id = self.kwargs['session_pk']
+    try:
+        session = ChatSession.objects.get(id=session_id, user=request.user)
+    except ChatSession.DoesNotExist:
+        return Response({"error": "Chat session not found."}, status=404)
+
+    # Save user's message
+    serializer = self.get_serializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    user_message = serializer.save(session=session, is_from_user=True)
+
+    # Prepare message content
+    gemini_content = []
+    if user_message.text:
+        gemini_content.append(user_message.text)
+    if user_message.file_upload:
         try:
-            session = ChatSession.objects.get(id=session_id, user=request.user)
-        except ChatSession.DoesNotExist:
-            return Response({"error": "Chat session not found."}, status=status.HTTP_404_NOT_FOUND)
-
-        # Save user's message
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user_message = serializer.save(session=session, is_from_user=True)
-
-        try:
-            model = genai.GenerativeModel(
-                'gemini-2.5-pro',
-                system_instruction=self.get_system_instruction()
-            )
-
-            # 🧩 Build content for current message
-            gemini_content = []
-            if user_message.text:
-                gemini_content.append(user_message.text)
-            if 'file_upload' in request.FILES:
-                try:
-                    img = Image.open(request.FILES['file_upload'])
-                    gemini_content.append(img)
-                except Exception as e:
-                    print(f"Image open failed: {e}")
-
-            if not gemini_content:
-                return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
-
-            # 🧠 Build full conversation history
-            history_for_api = []
-            for msg in session.messages.order_by('timestamp').all():
-                role = "user" if msg.is_from_user else "model"
-                parts = []
-                if msg.text:
-                    parts.append(msg.text)
-                if msg.file_upload:
-                    try:
-                        img = Image.open(msg.file_upload.path)
-                        parts.append(img)
-                    except Exception as e:
-                        print(f"Skipping image {msg.file_upload.path}: {e}")
-                if parts:
-                    history_for_api.append({"role": role, "parts": parts})
-
-            # ✅ Append the latest user message to history
-            history_for_api.append({"role": "user", "parts": gemini_content})
-
-            # 🧠 Start Gemini chat with full conversation memory
-            chat = model.start_chat(history=history_for_api[:-1])  # exclude the new msg if already appended
-            response = chat.send_message(gemini_content)
-            ai_response_text = response.text or "(No response)"
-
-            # 💾 Save AI's message
-            ai_message = Message.objects.create(
-                session=session,
-                text=ai_response_text,
-                is_from_user=False
-            )
-
-            # Serialize both messages and send them back
-            user_msg_serializer = self.get_serializer(user_message)
-            ai_msg_serializer = self.get_serializer(ai_message)
-
-            return Response(
-                {
-                    "user_message": user_msg_serializer.data,
-                    "bot_message": ai_msg_serializer.data,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
+            from PIL import Image
+            img = Image.open(user_message.file_upload.file)  # << use .file instead of .path
+            gemini_content.append(img)
         except Exception as e:
-            return Response({"error": f"API Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(f"Image processing failed: {e}")
+
+    if not gemini_content:
+        return Response({"error": "No text or image provided."}, status=400)
+
+    # Build chat history
+    history_for_api = []
+    for msg in session.messages.order_by('timestamp').all():
+        role = "user" if msg.is_from_user else "model"
+        parts = []
+        if msg.text:
+            parts.append(msg.text)
+        if msg.file_upload:
+            try:
+                img = Image.open(msg.file_upload.file)  # << safe for ephemeral storage
+                parts.append(img)
+            except Exception as e:
+                print(f"Skipping image: {e}")
+        if parts:
+            history_for_api.append({"role": role, "parts": parts})
+
+    # Append latest user message
+    history_for_api.append({"role": "user", "parts": gemini_content})
+
+    # Call AI model
+    try:
+        model = genai.GenerativeModel(
+            'gemini-2.5-pro',
+            system_instruction=self.get_system_instruction()
+        )
+        chat = model.start_chat(history=history_for_api[:-1])  # previous messages
+        response = chat.send_message(gemini_content)
+        ai_text = response.text or "(No response)"
+    except Exception as e:
+        ai_text = f"Error generating AI response: {e}"
+
+    # Save AI's message
+    ai_message = Message.objects.create(
+        session=session,
+        text=ai_text,
+        is_from_user=False
+    )
+
+    # Serialize both messages
+    return Response({
+        "user_message": self.get_serializer(user_message).data,
+        "bot_message": self.get_serializer(ai_message).data
+    }, status=201)
 
 
 # --- DEBUG VIEW (Can be removed after testing) ---

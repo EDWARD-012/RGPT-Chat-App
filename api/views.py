@@ -61,11 +61,15 @@ class ChatSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
     lookup_field = 'pk'
     def get_queryset(self):
-        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
+        session_id = self.kwargs['session_pk']
+        return Message.objects.filter(
+            session__user=self.request.user, 
+            session__id=session_id
+        ).order_by('timestamp')
 
 # --- MESSAGE CREATION VIEW (UNIFIED LOGIC) ---
 
-class MessageListCreateView(generics.CreateAPIView):
+class MessageListCreateView(generics.ListCreateAPIView):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -108,7 +112,7 @@ class MessageListCreateView(generics.CreateAPIView):
         """Generator for text-only streaming responses."""
         try:
             model = genai.GenerativeModel(
-                'gemini-flash-latest',
+                'gemini-2.5-flash-lite',
                 system_instruction=self.get_system_instruction()
             )
             history = [{"role": "user" if m.is_from_user else "model", "parts": [{"text": m.text}]}
@@ -141,7 +145,7 @@ class MessageListCreateView(generics.CreateAPIView):
 
         try:
             model = genai.GenerativeModel(
-                'gemini-2.5-pro',
+                'gemini-2.5-flash-lite',
                 system_instruction=self.get_system_instruction()
             )
 
@@ -156,39 +160,6 @@ class MessageListCreateView(generics.CreateAPIView):
             
             if not gemini_content:
                 return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # --- YEH HAI FINAL MEMORY FIX ---
-            # 1. Database se saari purani messages fetch karo
-            history_messages = session.messages.order_by('timestamp').all()
-
-            # 2. Unhe Gemini ke format mein convert karo (Text + Image)
-            history_for_api = []
-            for msg in history_messages:
-                role = "user" if msg.is_from_user else "model"
-                parts = []
-                
-                # Text ko hamesha add karo
-                if msg.text:
-                    parts.append(msg.text)
-                
-                # Agar message ke saath file hai, toh us image ko bhi parts mein add karo
-                if msg.file_upload:
-                    try:
-                        # File path se image ko open karo
-                        img = Image.open(msg.file_upload.path)
-                        parts.append(img)
-                    except FileNotFoundError:
-                        print(f"Warning: File not found at {msg.file_upload.path}. Skipping image.")
-                    except Exception as e:
-                        print(f"Warning: Could not process image {msg.file_upload.path}. Error: {e}")
-
-                if parts: # Agar parts khaali nahi hain, tabhi history mein add karo
-                    history_for_api.append({'role': role, 'parts': parts})
-            # --------------------------------
-
-            # 3. Poori history (text + images) ke saath AI ko call karo
-            response = model.generate_content(history_for_api)
-            ai_response_text = response.text
 
             # Generate response from AI
             response = model.generate_content(gemini_content)
@@ -220,3 +191,4 @@ def debug_instruction_view(request):
     # This view is for debugging purposes to check the system instruction on the server.
     instruction = MessageListCreateView().get_system_instruction()
     return JsonResponse({"system_instruction_on_server": instruction})
+

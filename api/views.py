@@ -220,4 +220,3 @@ def debug_instruction_view(request):
     # This view is for debugging purposes to check the system instruction on the server.
     instruction = MessageListCreateView().get_system_instruction()
     return JsonResponse({"system_instruction_on_server": instruction})
-

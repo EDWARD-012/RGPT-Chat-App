@@ -134,37 +134,51 @@ class MessageListCreateView(generics.CreateAPIView):
         except ChatSession.DoesNotExist:
             return Response({"error": "Chat session not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Save the user's message
         user_message_serializer = self.get_serializer(data=request.data)
         user_message_serializer.is_valid(raise_exception=True)
         user_message = user_message_serializer.save(session=session, is_from_user=True)
 
-        # --- THIS IS THE UNIFIED LOGIC ---
-        # If there's a file, handle it with a standard (non-streaming) response
-        if 'file_upload' in request.FILES:
-            try:
-                model = genai.GenerativeModel(
-                    'gemini-pro-latest',
-                    system_instruction=self.get_system_instruction()
-                )
+        try:
+            model = genai.GenerativeModel(
+                'gemini-pro-vision', # Vision model is best for image analysis
+                system_instruction=self.get_system_instruction()
+            )
+
+            gemini_content = []
+            if user_message.text:
+                gemini_content.append(user_message.text)
+            
+            if 'file_upload' in request.FILES:
                 image_file = request.FILES['file_upload']
                 img = Image.open(image_file)
-                
-                response = model.generate_content([user_message.text, img])
-                ai_response_text = response.text
+                gemini_content.append(img)
+            
+            if not gemini_content:
+                return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-                ai_message = Message.objects.create(session=session, text=ai_response_text, is_from_user=False)
-                ai_message_serializer = self.get_serializer(ai_message)
-                return Response(ai_message_serializer.data, status=status.HTTP_201_CREATED)
+            # Generate response from AI
+            response = model.generate_content(gemini_content)
+            ai_response_text = response.text
 
-            except Exception as e:
-                return Response({"error": f"API Error with image: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-        # Otherwise, handle it with a streaming response for text
-        else:
-            return StreamingHttpResponse(
-                self.stream_text_response(session, user_message.text),
-                content_type='text/plain'
+            # Save AI's message
+            ai_message = Message.objects.create(
+                session=session,
+                text=ai_response_text,
+                is_from_user=False
             )
+
+            # Serialize both messages and send them back
+            user_msg_serializer = self.get_serializer(user_message)
+            ai_msg_serializer = self.get_serializer(ai_message)
+            
+            return Response({
+                "user_message": user_msg_serializer.data,
+                "bot_message": ai_msg_serializer.data
+            }, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            return Response({"error": f"API Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # --- DEBUG VIEW (Can be removed after testing) ---
 @api_view(['GET'])

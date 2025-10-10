@@ -48,7 +48,7 @@ export default function MessageBubble({ message }) {
     >
       <div className={`flex items-start gap-4 ${isUser ? "flex-row-reverse" : ""}`}>
         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center${isUser ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-300'}`}>
-          {isUser ? <User size={20} color="white" /> : <Cpu size={20} color="white" />}
+          
         </div>
         <div className={`prose prose-invert max-w-2xl text-gray-300 p-4 rounded-xl ${isUser ? 'bg-blue-600' : 'bg-gray-700'}`}>
           <ReactMarkdown

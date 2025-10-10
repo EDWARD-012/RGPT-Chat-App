@@ -23,3 +23,11 @@ html.dark {
   background-color: #2a2c30;
   color: #f1f5f9;
 }
+
+.custom-textarea-color {
+  color: #111827 !important; /* Default (light mode) text color */
+}
+
+.dark .custom-textarea-color {
+  color: #f9fafb !important; /* Dark mode text color */
+}

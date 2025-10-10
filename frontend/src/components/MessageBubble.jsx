@@ -55,23 +55,18 @@ export default function MessageBubble({ message }) {
               : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-300'
           }`}
         >
-          {/* Avatar content */}
+          
         </div>
-        
         <div
           className={`prose prose-invert max-w-2xl p-4 rounded-xl ${
-            isUser
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-700 text-gray-300'
-          } inline-block`} // <-- Tailwind-only fix
+            isUser ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'
+          }`}
         >
           <ReactMarkdown components={{ code: CodeBlock }}>
             {message.text}
           </ReactMarkdown>
         </div>
-        
       </div>
     </motion.div>
-
   );
 }

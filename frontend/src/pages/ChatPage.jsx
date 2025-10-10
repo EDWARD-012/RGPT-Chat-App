@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import api from "../services/api";
-import { SendHorizontal, Paperclip } from "lucide-react";
+import { SendHorizontal, Cpu, Paperclip } from "lucide-react";
 import TextareaAutosize from "react-textarea-autosize";
 import TypingLoader from "../components/TypingLoader";
 import MessageBubble from "../components/MessageBubble";
@@ -19,13 +19,7 @@ export default function ChatPage() {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () =>
-    setTimeout(
-      () =>
-        messagesEndRef.current?.scrollIntoView({
-          behavior: "smooth",
-        }),
-      50
-    );
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
   useEffect(scrollToBottom, [messages, isTyping]);
 
@@ -55,7 +49,6 @@ export default function ChatPage() {
 
     setMessages((prev) => [...prev, newMsg]);
     const currentInput = input;
-    const currentFile = file;
     setInput("");
     setFile(null);
     setIsTyping(true);
@@ -64,7 +57,9 @@ export default function ChatPage() {
     try {
       const formData = new FormData();
       formData.append("text", currentInput);
-      if (currentFile) formData.append("file_upload", currentFile);
+      if (currentFile) {
+        formData.append('file_upload', currentFile);
+      }
 
       const res = await api.post(`/chats/${chatId}/messages/`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -99,13 +94,14 @@ export default function ChatPage() {
 
       {/* MAIN CHAT AREA */}
       <div className="flex flex-col flex-1 bg-white dark:bg-gray-950">
+        {/* NAVBAR */}
+        
+
         {/* CHAT MESSAGES */}
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto space-y-6">
             {isLoading && (
-              <p className="text-center text-gray-600 dark:text-gray-300">
-                Loading chat...
-              </p>
+              <p className="text-center text-gray-600 dark:text-gray-300">Loading chat...</p>
             )}
 
             {!isLoading && messages.length === 0 && (
@@ -117,25 +113,15 @@ export default function ChatPage() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 items-start ${
-                  msg.is_from_user
-                    ? "justify-end flex-row-reverse"
-                    : "justify-start"
+                className={`flex gap-3 ${
+                  msg.is_from_user ? "justify-end" : "justify-start"
                 }`}
               >
-                <img
-                  src={
-                    msg.is_from_user
-                      ? user?.profile_picture_url || "https://i.pravatar.cc/40"
-                      : logo
-                  }
-                  alt="avatar"
-                  className={`w-8 h-8 rounded-full self-start ${
-                    msg.is_from_user ? "border border-gray-300" : "p-1 bg-gradient-to-br from-purple-600 to-blue-500"
-                  }`}
-                />
+                
 
                 <MessageBubble message={msg} />
+
+                
               </div>
             ))}
 
@@ -144,14 +130,14 @@ export default function ChatPage() {
                 <img
                   src={logo}
                   alt="AI"
-                  className="w-8 h-8 rounded-full p-1 bg-gradient-to-br from-purple-600 to-blue-500 self-start"
+                  style={{ width: 32, height: 32}}
+                  className="rounded-full bg-gradient-to-br from-purple-600 to-blue-500 p-1"
                 />
-                <div className="inline-block p-4 rounded-xl bg-gray-200 dark:bg-gray-700">
+                <div className="p-4 rounded-xl bg-gray-200 dark:bg-gray-700">
                   <TypingLoader />
                 </div>
               </div>
             )}
-
             <div ref={messagesEndRef} />
           </div>
         </main>
@@ -163,6 +149,7 @@ export default function ChatPage() {
               onSubmit={handleSendMessage}
               className="flex items-end gap-3 bg-gray-100 dark:bg-gray-800 rounded-2xl p-2 border border-gray-300 dark:border-gray-700 focus-within:ring-2 focus-within:ring-purple-500 transition"
             >
+              {/* File Upload */}
               <label className="cursor-pointer p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full transition">
                 <Paperclip size={18} className="text-gray-600 dark:text-gray-300" />
                 <input
@@ -171,7 +158,7 @@ export default function ChatPage() {
                   onChange={(e) => setFile(e.target.files[0])}
                 />
               </label>
-
+              {/* Text Area */}
               <TextareaAutosize
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -187,6 +174,7 @@ export default function ChatPage() {
                 className="flex-1 bg-gray-50 border border-gray-300 rounded-lg p-3 outline-none resize-y text-gray-900 focus:ring-purple-500 focus:border-purple-500"
               />
 
+              {/* Send Button */}
               <button
                 type="submit"
                 disabled={isTyping || (!input.trim() && !file)}
@@ -196,6 +184,7 @@ export default function ChatPage() {
               </button>
             </form>
 
+            {/* File Name Preview */}
             {file && (
               <div className="text-sm text-gray-600 dark:text-gray-300 mt-2">
                 📎 {file.name}

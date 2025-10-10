@@ -31,3 +31,14 @@ html.dark {
 .dark .custom-textarea-color {
   color: #f9fafb !important; /* Dark mode text color */
 }
+
+/* Default light mode */
+.logo {
+  width: 32px;
+  height: 32px;
+  margin-right: 8px;
+  filter: invert(0); /* black logo as is */
+}
+
+/* Dark mode */
+

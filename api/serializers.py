@@ -10,11 +10,13 @@ class UserSerializer(serializers.ModelSerializer):
         ]
 
 class MessageSerializer(serializers.ModelSerializer):
-    """Serializer for individual messages."""
     class Meta:
         model = Message
-        fields = ['id', 'text', 'is_from_user', 'timestamp', 'file_upload']
-        read_only_fields = ['is_from_user', 'timestamp', 'id']
+        fields = ['id', 'session', 'text', 'file_upload', 'is_from_user', 'timestamp']
+        extra_kwargs = {
+            'text': {'required': False, 'allow_blank': True},
+            'file_upload': {'required': False, 'allow_null': True},
+        }
 
 class ChatSessionListSerializer(serializers.ModelSerializer):
     """Serializer for listing chat sessions."""

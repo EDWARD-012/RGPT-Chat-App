@@ -1,28 +1,138 @@
-# RGPT - A Personalized AI Chat Application
+# 💬 RGPT - A Personalized AI Chat Application
 
-This is a full-stack AI chat application built with a Django backend and a React frontend, powered by the Google Gemini API.
+A full-stack AI-powered chat application built with a **Django REST Framework backend** and a **React frontend**, powered by the **Google Gemini API**.  
+It offers real-time chatting, Google authentication, chat history, and a modern responsive UI.
 
-## Features
--   Real-time chat interface
--   User authentication via Google Sign-In
--   Persistent, user-specific chat histories
--   Markdown and code block rendering for AI responses
--   Image analysis capabilities
--   Collapsible sidebar with chat management (rename, pin)
--   Light/Dark theme toggle
+🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)  
+⚙️ *(Note: The app may load slowly initially as the backend is hosted on Render free tier.)*  
+🔗 **Backend API:** [https://rgpt-chat-app-backend.onrender.com](https://rgpt-chat-app-backend.onrender.com)
 
-## Tech Stack
-**Backend:**
--   Python / Django / Django Rest Framework
--   Google Gemini API
--   `django-allauth` for authentication
+---
 
-**Frontend:**
--   JavaScript / React / Vite
--   Tailwind CSS for styling
--   `@react-oauth/google` for login
--   `react-router-dom` for routing
--   `axios` for API communication
+## 🚀 Features
 
-## Setup and Installation
-(Add instructions here later on how to run your project)
+- 💬 Real-time chat interface  
+- 🔐 User authentication via **Google Sign-In**  
+- 💾 Persistent, user-specific chat histories  
+- 🧠 AI responses powered by **Google Gemini Pro API**  
+- 🖼️ Image analysis capabilities  
+- 🧩 Markdown & code block rendering for AI responses  
+- 📁 Collapsible sidebar with chat management (rename, pin, delete)  
+- 🌗 Light/Dark theme toggle  
+- ⚙️ REST API communication between React and Django  
+
+---
+
+## 🛠️ Tech Stack
+
+### **Backend**
+- Python / Django / Django REST Framework  
+- Google Gemini API  
+- `django-allauth` for Google authentication  
+- Deployed on **Render**
+
+### **Frontend**
+- JavaScript / React / Vite  
+- Tailwind CSS for styling  
+- `@react-oauth/google` for login  
+- `react-router-dom` for routing  
+- `axios` for API communication  
+- Deployed on **Vercel**
+
+---
+
+## 📦 Setup and Installation
+
+### 1️⃣ Clone the Repository
+```bash
+git clone https://github.com/EDWARD-012/RGPT-Chat-App.git
+cd RGPT-Chat-App
+````
+
+---
+
+### 2️⃣ Backend Setup
+
+```bash
+cd backend
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+```
+
+#### ⚙️ Create a `.env` file inside `backend/` and add:
+
+```
+GEMINI_API_KEY=your_gemini_api_key
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+```
+
+---
+
+### 3️⃣ Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+#### ⚙️ Create a `.env` file inside `frontend/` and add:
+
+```
+VITE_BACKEND_URL=https://rgpt-chat-app-backend.onrender.com
+VITE_GOOGLE_CLIENT_ID=your_google_client_id
+```
+
+> 🔹 The frontend uses environment variables for Google Authentication and backend API requests.
+> 🔹 Ensure `.env` is configured before running locally.
+
+---
+
+## 🗂️ Project Structure
+
+```
+RGPT-Chat-App/
+├── frontend/         # React + Vite + Tailwind frontend
+│   ├── src/
+│   └── .env
+├── backend/          # Django + DRF backend
+│   ├── chat/
+│   ├── users/
+│   └── .env
+└── README.md
+```
+
+---
+
+## 🌟 Future Improvements
+
+* ✨ UI redesign for a more polished and smooth experience
+* 🎨 Improved theme animations and transitions
+* 💬 Enhanced chat bubble design and message rendering
+* 📱 Better mobile responsiveness
+* ⚡ Performance optimization for faster load times
+
+---
+
+## 📸 Screenshots
+
+*(Add screenshots or GIFs of your chat interface here)*
+
+---
+
+## 🤝 Contributing
+
+Pull requests are welcome!
+For major changes, please open an issue first to discuss what you’d like to improve.
+
+---
+
+## 📜 License
+
+This project is open-source and available under the [MIT License](LICENSE).
+
+
+Would you like me to also add a **“Contact / Connect”** section at the end (with your GitHub and LinkedIn links) for portfolio visibility?
+```

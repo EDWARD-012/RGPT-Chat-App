@@ -118,7 +118,18 @@ RGPT-Chat-App/
 
 ## 📸 Screenshots
 
-*(Add screenshots or GIFs of your chat interface here)*
+
+<img width="1425" height="922" alt="Screenshot 2025-10-14 180245" src="https://github.com/user-attachments/assets/78e9178b-f306-4a97-9ed1-0fec6fa82d6c" />
+
+<img width="2879" height="1333" alt="Screenshot 2025-10-14 180420" src="https://github.com/user-attachments/assets/fb6c18ee-485e-45bd-8542-70b9d388028e" />
+
+<img width="2879" height="1349" alt="Screenshot 2025-10-14 180436" src="https://github.com/user-attachments/assets/43ebcc44-7efa-4970-87ad-7a4cd3fd717f" />
+
+<img width="2079" height="425" alt="Screenshot 2025-10-14 180449" src="https://github.com/user-attachments/assets/46338b7f-a917-47bb-a353-a0dcef417bd4" />
+
+<img width="2094" height="409" alt="Screenshot 2025-10-14 180458" src="https://github.com/user-attachments/assets/dbc03a98-c57c-454c-9c6b-4b8cf0acb8ce" />
+
+<img width="2879" height="1350" alt="Screenshot 2025-10-14 180618" src="https://github.com/user-attachments/assets/52622bf0-e139-43bd-9a2e-fc0a7ff2c572" />
 
 ---
 
@@ -134,5 +145,3 @@ For major changes, please open an issue first to discuss what you’d like to im
 This project is open-source and available under the [MIT License](LICENSE).
 
 
-Would you like me to also add a **“Contact / Connect”** section at the end (with your GitHub and LinkedIn links) for portfolio visibility?
-```

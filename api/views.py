@@ -108,7 +108,7 @@ class MessageListCreateView(generics.ListCreateAPIView):
         """Generator for text-only streaming responses."""
         try:
             model = genai.GenerativeModel(
-                'gemini-2.5-pro',
+                'gemini-2.5-flash',
                 system_instruction=self.get_system_instruction()
             )
             history = [{"role": "user" if m.is_from_user else "model", "parts": [{"text": m.text}]}

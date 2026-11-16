@@ -18,3 +18,13 @@ pnpm-debug.log*
 # IDE settings
 .vscode/
 .idea/
+# Local env files (keep the example)
+.env.*
+!.env.example
+
+# Vercel CLI
+.vercel
+
+# Django build output
+backend/staticfiles/
+.venv/

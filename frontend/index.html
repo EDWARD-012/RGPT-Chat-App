@@ -2,9 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>RGPT · Gemini-powered chat assistant</title>
+    <meta
+      name="description"
+      content="RGPT is a chat assistant built with React, Django REST Framework and the Gemini API. Sign in with Google and your chats are saved to your account."
+    />
+    <meta name="theme-color" content="#5b21b6" />
+    <meta property="og:title" content="RGPT · Gemini-powered chat assistant" />
+    <meta
+      property="og:description"
+      content="A full-stack chat app built with React, Django REST Framework and the Gemini API."
+    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved theme before the first paint so the page doesn't flash.
+      try {
+        var theme = localStorage.getItem('theme');
+        var dark = theme ? theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+        document.documentElement.classList.toggle('dark', dark);
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

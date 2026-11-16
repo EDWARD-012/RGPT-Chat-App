@@ -1,27 +1,28 @@
 from django.urls import path
+
 from .views import (
-    ChatSessionListCreateView,
     ChatSessionDetailView,
-    MessageListCreateView,
+    ChatSessionListCreateView,
+    CurrentUserView,
     GoogleLoginView,
-    debug_instruction_view
+    LogoutView,
+    MessageListCreateView,
+    health,
 )
 
 urlpatterns = [
-
-    path('auth/google/', GoogleLoginView.as_view(), name='google-login'),
-    path('debug-instruction/', debug_instruction_view, name='debug-instruction'),
-
-    # /api/chats/ -> List user's chats (GET) or create a new chat (POST)
-    path('chats/', ChatSessionListCreateView.as_view(), name='chat-session-list-create'),
-
-    # /api/chats/<id>/ -> Retrieve (GET), update (PUT/PATCH), or delete (DELETE) a specific chat
-    path('chats/<int:pk>/', ChatSessionDetailView.as_view(), name='chat-session-detail'),
-
-    # /api/chats/<session_id>/messages/ -> List messages in a chat (GET) or add a new message (POST)
-    path('chats/<int:session_pk>/messages/', MessageListCreateView.as_view(), name='message-list-create'),
-    
-
-    # path('chats/new/', create_chat, name='create-chat'),
-
+    path("health/", health, name="health"),
+    path("auth/google/", GoogleLoginView.as_view(), name="google-login"),
+    path("auth/user/", CurrentUserView.as_view(), name="current-user"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
+    # GET lists the user's chats, POST creates a new one.
+    path("chats/", ChatSessionListCreateView.as_view(), name="chat-session-list-create"),
+    # GET / PATCH / DELETE a single chat.
+    path("chats/<int:pk>/", ChatSessionDetailView.as_view(), name="chat-session-detail"),
+    # GET lists messages, POST sends a message and returns the reply.
+    path(
+        "chats/<int:session_pk>/messages/",
+        MessageListCreateView.as_view(),
+        name="message-list-create",
+    ),
 ]

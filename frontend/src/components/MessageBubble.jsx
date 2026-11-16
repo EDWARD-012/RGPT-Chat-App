@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from '../lib/highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard, ClipboardCheck, ImageIcon } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
@@ -13,7 +13,7 @@ const MotionDiv = motion.div;
 const CodeBlock = ({ className, children }) => {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, '');
-  const language = /language-(\w+)/.exec(className || '')?.[1];
+  const language = /language-([\w+#-]+)/.exec(className || '')?.[1];
 
   // Inline `code` has no language and no line breaks.
   if (!language && !code.includes('\n')) {

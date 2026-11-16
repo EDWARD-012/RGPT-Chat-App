@@ -37,8 +37,5 @@
     "tailwindcss": "^4.3.5",
     "vite": "^7.1.7"
   },
-  "description": "React frontend for RGPT, a Gemini-powered chat app.",
-  "engines": {
-    "node": ">=20"
-  }
+  "description": "React frontend for RGPT, a Gemini-powered chat app."
 }

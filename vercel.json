@@ -1,0 +1,24 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "web": {
+      "root": "frontend",
+      "framework": "vite",
+      "rewrites": [{ "source": "/:path*", "destination": "/index.html" }]
+    },
+    "backend": {
+      "root": "backend",
+      "framework": "django",
+      "buildCommand": "if [ -n \"$DATABASE_URL\" ]; then python manage.py migrate --noinput; else echo 'DATABASE_URL is not set, skipping migrations'; fi",
+      "functions": {
+        "rgpt_backend/wsgi.py": { "maxDuration": 60 }
+      }
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": { "service": "backend" } },
+    { "source": "/admin(.*)", "destination": { "service": "backend" } },
+    { "source": "/static/(.*)", "destination": { "service": "backend" } },
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}

@@ -3,9 +3,9 @@
 A full-stack AI-powered chat application built with a **Django REST Framework backend** and a **React frontend**, powered by the **Google Gemini API**.  
 It offers real-time chatting, Google authentication, chat history, and a modern responsive UI.
 
-🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)  
-⚙️ *(Note: The app may load slowly initially as the backend is hosted on Render free tier.)*  
-🔗 **Backend API:** [https://rgpt-chat-app-backend.onrender.com](https://rgpt-chat-app-backend.onrender.com)
+🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)
+
+The frontend and the Django API both run on Vercel in one project. The API lives under `/api/` on the same domain.
 
 ---
 
@@ -14,7 +14,7 @@ It offers real-time chatting, Google authentication, chat history, and a modern 
 - 💬 Real-time chat interface  
 - 🔐 User authentication via **Google Sign-In**  
 - 💾 Persistent, user-specific chat histories  
-- 🧠 AI responses powered by **Google Gemini Pro API**  
+- 🧠 AI responses powered by the **Google Gemini API**, with earlier messages in the chat sent as context  
 - 🖼️ Image analysis capabilities  
 - 🧩 Markdown & code block rendering for AI responses  
 - 📁 Collapsible sidebar with chat management (rename, pin, delete)  
@@ -27,9 +27,10 @@ It offers real-time chatting, Google authentication, chat history, and a modern 
 
 ### **Backend**
 - Python / Django / Django REST Framework  
-- Google Gemini API  
-- `django-allauth` for Google authentication  
-- Deployed on **Render**
+- Google Gemini API through the `google-genai` SDK  
+- Google ID token verification with `google-auth`, DRF token auth for the API  
+- Postgres (Neon) in production, SQLite locally  
+- Deployed on **Vercel** as a Python function
 
 ### **Frontend**
 - JavaScript / React / Vite  
@@ -47,30 +48,32 @@ It offers real-time chatting, Google authentication, chat history, and a modern 
 ```bash
 git clone https://github.com/EDWARD-012/RGPT-Chat-App.git
 cd RGPT-Chat-App
-````
+```
 
 ---
 
-### 2️⃣ Backend Setup
+### 2️⃣ Environment variables
+
+Copy `.env.example` to `.env` in the repo root and fill it in. Both the backend and the Vite dev server read this one file. Leave `DATABASE_URL` empty to use SQLite.
+
+---
+
+### 3️⃣ Backend Setup (Python 3.12)
 
 ```bash
 cd backend
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate
 python manage.py runserver
 ```
 
-#### ⚙️ Create a `.env` file inside `backend/` and add:
-
-```
-GEMINI_API_KEY=your_gemini_api_key
-GOOGLE_CLIENT_ID=your_google_client_id
-GOOGLE_CLIENT_SECRET=your_google_client_secret
-```
+Run the tests with `python manage.py test api`.
 
 ---
 
-### 3️⃣ Frontend Setup
+### 4️⃣ Frontend Setup
 
 ```bash
 cd frontend
@@ -78,15 +81,26 @@ npm install
 npm run dev
 ```
 
-#### ⚙️ Create a `.env` file inside `frontend/` and add:
+The Vite dev server proxies `/api`, `/admin` and `/static` to Django on port 8000, so open http://localhost:5173. Add `http://localhost:5173` to the authorized JavaScript origins of your Google OAuth client for sign-in to work locally.
 
-```
-VITE_BACKEND_URL=https://rgpt-chat-app-backend.onrender.com
-VITE_GOOGLE_CLIENT_ID=your_google_client_id
-```
+---
 
-> 🔹 The frontend uses environment variables for Google Authentication and backend API requests.
-> 🔹 Ensure `.env` is configured before running locally.
+## ▲ Deploying on Vercel
+
+`vercel.json` defines two Vercel Services in one project: `frontend/` is built with Vite and `backend/` runs Django as a Python function. Requests to `/api/*`, `/admin*` and `/static/*` go to Django and everything else goes to the React app. Each build runs `migrate` when `DATABASE_URL` is set.
+
+In the Vercel project settings, the Root Directory is the repo root and the Framework Preset is Services. Set these environment variables for Production and Preview:
+
+| Variable | Notes |
+| --- | --- |
+| `DJANGO_SECRET_KEY` | Long random string |
+| `GEMINI_API_KEY` | From Google AI Studio |
+| `VITE_GOOGLE_CLIENT_ID` | OAuth web client ID, used by the frontend and the backend |
+| `DATABASE_URL` | Added by the Neon integration when you connect a database |
+
+`GET /api/health/` reports which of these the deployment can see, without showing their values.
+
+Every Vercel origin that shows the sign-in button (the production domain and any preview URL you test on) has to be listed under Authorized JavaScript origins for the OAuth client in Google Cloud Console.
 
 ---
 
@@ -95,13 +109,13 @@ VITE_GOOGLE_CLIENT_ID=your_google_client_id
 ```
 RGPT-Chat-App/
 ├── frontend/         # React + Vite + Tailwind frontend
-│   ├── src/
-│   └── .env
+│   └── src/
 ├── backend/          # Django + DRF backend
-│   ├── chat/
-│   ├── users/
-│   └── .env
-└── README.md
+│   ├── api/          # Models, views, serializers, tests
+│   └── rgpt_backend/ # Settings and URLs
+├── vercel.json       # Vercel Services config
+├── .env.example
+└── readme.md
 ```
 
 ---

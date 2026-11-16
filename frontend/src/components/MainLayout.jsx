@@ -1,72 +1,122 @@
-import { Outlet, useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
-import { AppSidebar } from "./AppSidebar.jsx";
-import Navbar from "./Navbar.jsx";
-import api from "../services/api.js";
-import { groupChatsByDate } from "../lib/utils.js";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { CircleAlert, X } from 'lucide-react';
+import { AppSidebar } from './AppSidebar.jsx';
+import Navbar from './Navbar.jsx';
+import api, { errorMessage } from '../services/api.js';
+import { groupChatsByDate } from '../lib/utils.js';
+
+const isDesktop = () => window.matchMedia('(min-width: 768px)').matches;
 
 export default function MainLayout() {
-  const [allChats, setAllChats] = useState([]);
-  const [chatGroups, setChatGroups] = useState({ today: [], yesterday: [], previous7Days: [], older: [] });
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [chats, setChats] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(isDesktop);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const fetchChatSessions = () => {
-    api.get('/chats/')
-      .then(res => {
-        setAllChats(res.data);
-        setChatGroups(groupChatsByDate(res.data));
-      })
-      .catch(err => console.error("Error fetching chat sessions:", err));
+  const chatGroups = useMemo(() => groupChatsByDate(chats), [chats]);
+
+  const refreshChats = useCallback(() => {
+    return api
+      .get('chats/')
+      .then((res) => setChats(res.data))
+      .catch((err) => setError(errorMessage(err, 'Could not load your chats.')));
+  }, []);
+
+  useEffect(() => {
+    refreshChats();
+  }, [refreshChats]);
+
+  // On phones the sidebar is an overlay, so close it after navigating.
+  useEffect(() => {
+    if (!isDesktop()) setIsSidebarOpen(false);
+  }, [location.pathname]);
+
+  const startChat = useCallback(
+    async (initialMessage) => {
+      try {
+        const res = await api.post('chats/');
+        setChats((prev) => [res.data, ...prev]);
+        navigate(`/chats/${res.data.id}`, initialMessage ? { state: { initialMessage } } : undefined);
+      } catch (err) {
+        setError(errorMessage(err, 'Could not start a new chat.'));
+      }
+    },
+    [navigate],
+  );
+
+  const renameChat = async (chatId, title) => {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    try {
+      await api.patch(`chats/${chatId}/`, { title: trimmed.slice(0, 200) });
+      refreshChats();
+    } catch (err) {
+      setError(errorMessage(err, 'Could not rename the chat.'));
+    }
   };
 
-  useEffect(() => { fetchChatSessions(); }, []);
-
-  const handleNewChat = async () => {
+  const togglePin = async (chatId) => {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!chat) return;
     try {
-      const res = await api.post('/chats/');
-      fetchChatSessions(); 
-      navigate(`/chats/${res.data.id}`);
-    } catch (error) { console.error("Error creating new chat:", error); }
+      await api.patch(`chats/${chatId}/`, { pinned: !chat.pinned });
+      refreshChats();
+    } catch (err) {
+      setError(errorMessage(err, 'Could not update the chat.'));
+    }
   };
 
-  const handleRenameChat = async (chatId, newTitle) => {
+  const deleteChat = async (chatId) => {
+    const chat = chats.find((c) => c.id === chatId);
+    if (!window.confirm(`Delete "${chat?.title || 'this chat'}"?`)) return;
     try {
-      await api.patch(`/chats/${chatId}/`, { title: newTitle });
-      fetchChatSessions();
-    } catch (error) { console.error("Error renaming chat:", error); }
-  };
-
-  const handlePinChat = async (chatId) => {
-    const chatToPin = allChats.find(c => c.id === chatId);
-    if (!chatToPin) return;
-    try {
-      await api.patch(`/chats/${chatId}/`, { pinned: !chatToPin.pinned });
-      fetchChatSessions();
-    } catch (error) { console.error("Error pinning chat:", error); }
+      await api.delete(`chats/${chatId}/`);
+      setChats((prev) => prev.filter((c) => c.id !== chatId));
+      if (location.pathname === `/chats/${chatId}`) navigate('/');
+    } catch (err) {
+      setError(errorMessage(err, 'Could not delete the chat.'));
+    }
   };
 
   return (
-    <div className="flex bg-white dark:bg-gray-900 text-gray-900 dark:text-white overflow-hidden">
-        {isSidebarOpen && (
-            <AppSidebar
-            allChats={allChats}
-            chatGroups={chatGroups}
-            handleNewChat={handleNewChat}
-            onRenameChat={handleRenameChat}
-            onPinChat={handlePinChat}
-            />
+    <div className="flex h-dvh overflow-hidden bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-20 bg-black/40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      <AppSidebar
+        open={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        allChats={chats}
+        chatGroups={chatGroups}
+        onNewChat={() => startChat()}
+        onRenameChat={renameChat}
+        onPinChat={togglePin}
+        onDeleteChat={deleteChat}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Navbar isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+
+        {error && (
+          <div
+            role="alert"
+            className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300"
+          >
+            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError('')} aria-label="Dismiss" className="rounded p-1 hover:bg-red-100 dark:hover:bg-red-900/50">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         )}
 
-        <div className="flex-1 flex flex-col min-h-0">
-            <Navbar
-            isSidebarOpen={isSidebarOpen}
-            setIsSidebarOpen={setIsSidebarOpen}
-            />
-            <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0">
-            <Outlet />
-            </div>
-        </div>
-        </div>
+        <main className="min-h-0 flex-1">
+          <Outlet context={{ startChat, refreshChats }} />
+        </main>
+      </div>
+    </div>
   );
 }

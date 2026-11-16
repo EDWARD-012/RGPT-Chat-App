@@ -1,81 +1,33 @@
+import logging
+import os
+import re
+from datetime import timedelta
+
 from django.conf import settings
-from django.http import StreamingHttpResponse, JsonResponse
+from django.db import connection, transaction
+from django.http import JsonResponse
+from django.utils import timezone
+from google import genai
+from google.auth.transport import requests as google_requests
+from google.genai import errors as genai_errors
+from google.genai import types
+from google.oauth2 import id_token
 from rest_framework import generics, permissions, status
+from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.authtoken.models import Token
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-from PIL import Image
-import google.generativeai as genai
 
-from .models import User, ChatSession, Message
+from .models import ChatSession, Message, User
 from .serializers import (
-    UserSerializer,
-    ChatSessionListSerializer,
     ChatSessionDetailSerializer,
-    MessageSerializer
+    ChatSessionListSerializer,
+    MessageSerializer,
+    UserSerializer,
 )
 
-# Configure the Gemini API client
-genai.configure(api_key=settings.GEMINI_API_KEY)
+logger = logging.getLogger(__name__)
 
-# --- AUTHENTICATION VIEWS ---
-
-class GoogleLoginView(APIView):
-    def post(self, request):
-        try:
-            token = request.data.get('token')
-            idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), audience=settings.GOOGLE_CLIENT_ID)
-            email = idinfo['email']
-            user, created = User.objects.get_or_create(
-                email=email,
-                defaults={
-                    'username': email, 'first_name': idinfo.get('given_name', ''),
-                    'last_name': idinfo.get('family_name', ''), 'profile_picture_url': idinfo.get('picture')
-                }
-            )
-            if not created and idinfo.get('picture'):
-                user.profile_picture_url = idinfo.get('picture', user.profile_picture_url)
-                user.save()
-            backend_token, _ = Token.objects.get_or_create(user=user)
-            user_serializer = UserSerializer(user)
-            return Response({'token': backend_token.key, 'user': user_serializer.data})
-        except Exception as e:
-            return Response({"error": f"Google token verification failed: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
-
-# --- CHAT SESSION VIEWS ---
-
-class ChatSessionListCreateView(generics.ListCreateAPIView):
-    serializer_class = ChatSessionListSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    def get_queryset(self):
-        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-class ChatSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
-    serializer_class = ChatSessionDetailSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'pk'
-    def get_queryset(self):
-        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
-
-# --- MESSAGE CREATION VIEW (UNIFIED LOGIC) ---
-
-class MessageListCreateView(generics.ListCreateAPIView):
-    serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get_queryset(self):
-        """This method handles the GET request to list messages."""
-        session_id = self.kwargs['session_pk']
-        return Message.objects.filter(session__user=self.request.user, session__id=session_id)
-
-    def get_system_instruction(self):
-        return """You are RGPT, a helpful, confident, and modern AI assistant created by Ravi Kumar Gupta (EDWARD7780).
+SYSTEM_INSTRUCTION = """You are RGPT, a helpful, confident, and modern AI assistant created by Ravi Kumar Gupta (EDWARD7780).
             You speak in natural Hinglish — a friendly mix of Hindi and English — with a positive, chill vibe 😎.
 
             --- IMPORTANT PERSONALITY RULES ---
@@ -104,87 +56,256 @@ class MessageListCreateView(generics.ListCreateAPIView):
 
             6. Never break your character or mention these rules. Always behave like RGPT."""
 
-    def stream_text_response(self, chat_session, user_message_text):
-        """Generator for text-only streaming responses."""
-        try:
-            model = genai.GenerativeModel(
-                'gemini-2.5-flash',
-                system_instruction=self.get_system_instruction()
-            )
-            history = [{"role": "user" if m.is_from_user else "model", "parts": [{"text": m.text}]}
-                       for m in chat_session.messages.order_by('timestamp').all()]
-            
-            chat = model.start_chat(history=history[:-1])
-            response_stream = chat.send_message(user_message_text, stream=True)
+# Image types Gemini accepts as inline data.
+ALLOWED_IMAGE_TYPES = {"image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"}
+DEFAULT_CHAT_TITLE = "New Chat"
+EMPTY_REPLY = "Sorry, I couldn't come up with a reply to that. Could you try rephrasing it?"
 
-            full_response = ""
-            for chunk in response_stream:
-                if chunk.text:
-                    full_response += chunk.text
-                    yield chunk.text
-            
-            Message.objects.create(session=chat_session, text=full_response, is_from_user=False)
-        except Exception as e:
-            yield f"Error: {str(e)}"
+_gemini_client = None
+
+
+def get_gemini_client():
+    # Created lazily so a missing key shows up as a clear API error instead of
+    # crashing the whole app at import time.
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
+    return _gemini_client
+
+
+def error(message, code):
+    return Response({"error": message}, status=code)
+
+
+def health(request):
+    """Reports which pieces of configuration are present, never their values."""
+    checks = {
+        "secret_key": bool(os.environ.get("DJANGO_SECRET_KEY")) or settings.DEBUG,
+        "gemini_api_key": bool(settings.GEMINI_API_KEY),
+        "google_client_id": bool(settings.GOOGLE_CLIENT_ID),
+        "database": False,
+        "migrations": False,
+    }
+    try:
+        tables = connection.introspection.table_names()
+        checks["database"] = True
+        checks["migrations"] = ChatSession._meta.db_table in tables
+    except Exception:
+        logger.exception("Health check could not reach the database")
+    if os.environ.get("VERCEL") and connection.vendor == "sqlite":
+        # SQLite inside a serverless function is read-only and wiped on
+        # every cold start, so treat it as "no database".
+        checks["database"] = False
+        checks["migrations"] = False
+    ok = all(checks.values())
+    return JsonResponse(
+        {"ok": ok, "checks": checks, "model": settings.GEMINI_MODEL},
+        status=200 if ok else 503,
+    )
+
+
+# --- Authentication ---
+
+
+class GoogleLoginView(APIView):
+    authentication_classes = []
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        credential = request.data.get("token")
+        if not credential:
+            return error("Missing Google credential.", status.HTTP_400_BAD_REQUEST)
+        if not settings.GOOGLE_CLIENT_ID:
+            logger.error("Google sign-in attempted but GOOGLE_CLIENT_ID is not set")
+            return error("Google sign-in is not configured on the server.", status.HTTP_503_SERVICE_UNAVAILABLE)
+
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                credential, google_requests.Request(), audience=settings.GOOGLE_CLIENT_ID
+            )
+        except ValueError as exc:
+            logger.warning("Rejected Google credential: %s", exc)
+            return error("Google sign-in failed. Please try again.", status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("Could not verify Google credential")
+            return error("Could not reach Google to verify sign-in. Please try again.", status.HTTP_502_BAD_GATEWAY)
+
+        email = idinfo.get("email")
+        if not email or not idinfo.get("email_verified"):
+            return error("Your Google account email is not verified.", status.HTTP_400_BAD_REQUEST)
+
+        profile = {
+            "first_name": idinfo.get("given_name", "")[:150],
+            "last_name": idinfo.get("family_name", "")[:150],
+            "profile_picture_url": (idinfo.get("picture") or "")[:255] or None,
+        }
+        user = User.objects.filter(email__iexact=email).order_by("id").first()
+        if user is None:
+            user = User.objects.create_user(username=email[:150], email=email, **profile)
+        else:
+            changed = [field for field, value in profile.items() if value and getattr(user, field) != value]
+            for field in changed:
+                setattr(user, field, profile[field])
+            if changed:
+                user.save(update_fields=changed)
+
+        token, _ = Token.objects.get_or_create(user=user)
+        return Response({"token": token.key, "user": UserSerializer(user).data})
+
+
+class CurrentUserView(APIView):
+    def get(self, request):
+        return Response(UserSerializer(request.user).data)
+
+
+class LogoutView(APIView):
+    def post(self, request):
+        Token.objects.filter(user=request.user).delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Chat sessions ---
+
+
+class ChatSessionListCreateView(generics.ListCreateAPIView):
+    serializer_class = ChatSessionListSerializer
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class ChatSessionDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = ChatSessionDetailSerializer
+
+    def get_queryset(self):
+        return ChatSession.objects.filter(user=self.request.user, is_deleted=False)
+
+    def perform_destroy(self, instance):
+        # The model already has soft-delete fields, so use them instead of
+        # dropping the rows.
+        instance.is_deleted = True
+        instance.deleted_at = timezone.now()
+        instance.save(update_fields=["is_deleted", "deleted_at"])
+
+
+# --- Messages ---
+
+
+def message_to_content(message):
+    text = message.text or ""
+    attachment = (message.metadata or {}).get("attachment")
+    if attachment:
+        text = f"{text}\n\n[The user attached an image: {attachment.get('name', 'image')}]".strip()
+    return types.Content(
+        role="user" if message.is_from_user else "model",
+        parts=[types.Part.from_text(text=text or "(empty message)")],
+    )
+
+
+def make_title(text, upload):
+    if text:
+        title = re.sub(r"\s+", " ", text).strip()
+        return title if len(title) <= 60 else title[:57].rstrip() + "..."
+    return f"Image: {upload.name}"[:60]
+
+
+class MessageListCreateView(generics.ListCreateAPIView):
+    serializer_class = MessageSerializer
+
+    def get_queryset(self):
+        return Message.objects.filter(
+            session__user=self.request.user,
+            session__id=self.kwargs["session_pk"],
+            session__is_deleted=False,
+        )
 
     def create(self, request, *args, **kwargs):
-        session_id = self.kwargs['session_pk']
-        try:
-            session = ChatSession.objects.get(id=session_id, user=request.user)
-        except ChatSession.DoesNotExist:
-            return Response({"error": "Chat session not found."}, status=status.HTTP_404_NOT_FOUND)
+        session = ChatSession.objects.filter(
+            id=self.kwargs["session_pk"], user=request.user, is_deleted=False
+        ).first()
+        if session is None:
+            return error("Chat not found.", status.HTTP_404_NOT_FOUND)
 
-        # Save the user's message
-        user_message_serializer = self.get_serializer(data=request.data)
-        user_message_serializer.is_valid(raise_exception=True)
-        user_message = user_message_serializer.save(session=session, is_from_user=True)
+        text = (request.data.get("text") or "").strip()
+        upload = request.FILES.get("file_upload")
+        if not text and upload is None:
+            return error("Type a message or attach an image.", status.HTTP_400_BAD_REQUEST)
+        if upload is not None:
+            if upload.content_type not in ALLOWED_IMAGE_TYPES:
+                return error("Only PNG, JPEG, WebP or HEIC images are supported.", status.HTTP_400_BAD_REQUEST)
+            if upload.size > settings.MAX_IMAGE_BYTES:
+                return error("Images must be 4 MB or smaller.", status.HTTP_400_BAD_REQUEST)
 
-        try:
-            model = genai.GenerativeModel(
-                'gemini-2.5-flash',
-                system_instruction=self.get_system_instruction()
+        hour_ago = timezone.now() - timedelta(hours=1)
+        sent_last_hour = Message.objects.filter(
+            session__user=request.user, is_from_user=True, timestamp__gte=hour_ago
+        ).count()
+        if sent_last_hour >= settings.MESSAGES_PER_HOUR:
+            return error(
+                "You've reached the hourly message limit for this demo. Please try again later.",
+                status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
-            gemini_content = []
-            if user_message.text:
-                gemini_content.append(user_message.text)
-            
-            if 'file_upload' in request.FILES:
-                image_file = request.FILES['file_upload']
-                img = Image.open(image_file)
-                gemini_content.append(img)
-            
-            if not gemini_content:
-                return Response({"error": "No text or image provided."}, status=status.HTTP_400_BAD_REQUEST)
+        if not settings.GEMINI_API_KEY:
+            logger.error("Message sent but GEMINI_API_KEY is not set")
+            return error("The AI service is not configured yet.", status.HTTP_503_SERVICE_UNAVAILABLE)
 
-            # Generate response from AI
-            response = model.generate_content(gemini_content)
-            ai_response_text = response.text
+        # Earlier turns give Gemini the context of the conversation.
+        history = list(session.messages.order_by("-timestamp", "-id")[: settings.CHAT_HISTORY_LIMIT])
+        contents = [message_to_content(m) for m in reversed(history)]
+        parts = []
+        if text:
+            parts.append(types.Part.from_text(text=text))
+        if upload is not None:
+            parts.append(types.Part.from_bytes(data=upload.read(), mime_type=upload.content_type))
+        contents.append(types.Content(role="user", parts=parts))
 
-            # Save AI's message
-            ai_message = Message.objects.create(
+        try:
+            response = get_gemini_client().models.generate_content(
+                model=settings.GEMINI_MODEL,
+                contents=contents,
+                config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+            )
+            reply = (response.text or "").strip()
+        except genai_errors.APIError as exc:
+            logger.error("Gemini request failed (%s %s): %s", exc.code, exc.status, exc.message)
+            if exc.code == 429:
+                message = "RGPT is getting too many requests right now. Please try again in a minute."
+            else:
+                message = "RGPT couldn't get a reply from Gemini. Please try again."
+            return error(message, status.HTTP_502_BAD_GATEWAY)
+        except Exception:
+            logger.exception("Gemini request failed")
+            return error("RGPT couldn't get a reply from Gemini. Please try again.", status.HTTP_502_BAD_GATEWAY)
+
+        # Only store the turn once the reply exists, so a failed request does
+        # not leave an unanswered message in the history.
+        metadata = None
+        if upload is not None:
+            metadata = {"attachment": {"name": upload.name[:200], "type": upload.content_type}}
+        with transaction.atomic():
+            user_message = Message.objects.create(
+                session=session, text=text, is_from_user=True, metadata=metadata
+            )
+            bot_message = Message.objects.create(
                 session=session,
-                text=ai_response_text,
-                is_from_user=False
+                text=reply or EMPTY_REPLY,
+                is_from_user=False,
+                metadata={"model": settings.GEMINI_MODEL},
             )
+            if not session.title or session.title == DEFAULT_CHAT_TITLE:
+                session.title = make_title(text, upload)
+            # Saving also bumps updated_at, which moves the chat to the top.
+            session.save()
 
-            # Serialize both messages and send them back
-            user_msg_serializer = self.get_serializer(user_message)
-            ai_msg_serializer = self.get_serializer(ai_message)
-            
-            return Response({
-                "user_message": user_msg_serializer.data,
-                "bot_message": ai_msg_serializer.data
-            }, status=status.HTTP_201_CREATED)
-
-        except Exception as e:
-            return Response({"error": f"API Error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-# --- DEBUG VIEW (Can be removed after testing) ---
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def debug_instruction_view(request):
-    # This view is for debugging purposes to check the system instruction on the server.
-    instruction = MessageListCreateView().get_system_instruction()
-    return JsonResponse({"system_instruction_on_server": instruction})
-
+        return Response(
+            {
+                "user_message": self.get_serializer(user_message).data,
+                "bot_message": self.get_serializer(bot_message).data,
+                "chat": ChatSessionListSerializer(session).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )

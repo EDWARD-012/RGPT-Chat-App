@@ -1,34 +1,39 @@
 from rest_framework import serializers
-from .models import User, ChatSession, Message
+
+from .models import ChatSession, Message, User
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = [
-            'id', 'username', 'first_name', 'last_name', 'email', 
-            'profile_picture_url' # <-- ADD THIS LINE
-        ]
+        fields = ["id", "username", "first_name", "last_name", "email", "profile_picture_url"]
+
 
 class MessageSerializer(serializers.ModelSerializer):
-    """Serializer for individual messages."""
+    # Uploaded images are passed straight to Gemini and not stored (serverless
+    # functions have no persistent disk), so only the file name is kept.
+    attachment = serializers.SerializerMethodField()
+
     class Meta:
         model = Message
-        fields = ['id', 'text', 'is_from_user', 'timestamp', 'file_upload']
-        read_only_fields = ['is_from_user', 'timestamp', 'id']
+        fields = ["id", "text", "is_from_user", "timestamp", "attachment"]
+        read_only_fields = fields
+
+    def get_attachment(self, message):
+        return (message.metadata or {}).get("attachment")
+
 
 class ChatSessionListSerializer(serializers.ModelSerializer):
-    """Serializer for listing chat sessions."""
-    user = UserSerializer(read_only=True)
-    
     class Meta:
         model = ChatSession
-        fields = ['id', 'user', 'title', 'created_at', 'updated_at','pinned']
+        fields = ["id", "title", "created_at", "updated_at", "pinned"]
+        read_only_fields = ["id", "created_at", "updated_at"]
+
 
 class ChatSessionDetailSerializer(serializers.ModelSerializer):
-    """Serializer for a single chat session with all its messages."""
-    user = UserSerializer(read_only=True)
-    messages = MessageSerializer(many=True, read_only=True) # Nest all messages
+    messages = MessageSerializer(many=True, read_only=True)
 
     class Meta:
         model = ChatSession
-        fields = ['id', 'user', 'title', 'messages', 'created_at', 'updated_at','pinned']
+        fields = ["id", "title", "messages", "created_at", "updated_at", "pinned"]
+        read_only_fields = ["id", "messages", "created_at", "updated_at"]

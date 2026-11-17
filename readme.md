@@ -12,8 +12,6 @@
 <p align="center">
   <a href="https://rgpt-chat-app.vercel.app"><b>Live demo</b></a>
   &nbsp;·&nbsp;
-  <a href="https://edward7780.vercel.app">Portfolio</a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/EDWARD-012">GitHub</a>
 </p>
 
@@ -164,4 +162,4 @@ Released under the MIT License.
 
 ---
 
-Built by Ravi Kumar Gupta ([EDWARD7780](https://edward7780.vercel.app)).
+Built by Ravi Kumar Gupta ([EDWARD7780](https://github.com/EDWARD-012)).

@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import { ArrowUpRight, CircleAlert, Github, LoaderCircle } from 'lucide-react';
+import { CircleAlert, Github, LoaderCircle } from 'lucide-react';
 import BrandMark, { Wordmark } from '../components/BrandMark';
 import DemoChat from '../components/DemoChat';
 import api, { errorMessage } from '../services/api';
 import { useAuth } from '../context/useAuth';
 
-const PORTFOLIO_URL = 'https://edward7780.vercel.app';
 const GITHUB_URL = 'https://github.com/EDWARD-012/RGPT-Chat-App';
 
 const phrases = [
@@ -73,11 +72,7 @@ export default function LoginPage() {
           <BrandMark size={38} className="transition-transform duration-300 group-hover:-rotate-6" />
           <Wordmark className="text-xl" />
         </a>
-        <nav className="flex items-center gap-4 font-mono text-xs sm:gap-6 sm:text-sm">
-          <a href={PORTFOLIO_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-paper/70 hover:text-haldi">
-            by EDWARD7780
-            <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
+        <nav className="flex items-center font-mono text-xs sm:text-sm">
           <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-paper/70 hover:text-haldi">
             <Github size={15} aria-hidden="true" />
             <span className="hidden sm:inline">source</span>
@@ -181,20 +176,10 @@ export default function LoginPage() {
 
       <footer className="border-t border-ink-4">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-6 font-mono text-xs text-paper/60">
-          <p>
-            Built by{' '}
-            <a href={PORTFOLIO_URL} target="_blank" rel="noreferrer" className="text-paper underline decoration-haldi underline-offset-4 hover:text-haldi">
-              Ravi Kumar Gupta (EDWARD7780)
-            </a>
-          </p>
-          <div className="flex items-center gap-5">
-            <a href={PORTFOLIO_URL} target="_blank" rel="noreferrer" className="hover:text-haldi">
-              Portfolio
-            </a>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-haldi">
-              GitHub
-            </a>
-          </div>
+          <p>Built by Ravi Kumar Gupta (EDWARD7780)</p>
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="hover:text-haldi">
+            GitHub
+          </a>
         </div>
       </footer>
     </div>

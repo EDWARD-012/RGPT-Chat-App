@@ -5,7 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* Warm near-black and bone white, shared with the EDWARD7780 portfolio. */
+  /* Warm near-black and bone white. */
   --color-ink: #0f0d0b;
   --color-ink-2: #181512;
   --color-ink-3: #231f1a;
@@ -15,7 +15,7 @@
   --color-paper-3: #ddd2bf;
   --color-paper-4: #c8baa2;
   --color-muted: #8c8272;
-  /* RGPT's own accent: haldi (turmeric) yellow. Chili is the portfolio's signal colour. */
+  /* RGPT's accent is haldi (turmeric) yellow. Chili is for small signals like pins and errors. */
   --color-haldi: #ffc233;
   --color-haldi-deep: #e9a400;
   --color-chili: #ff5a1f;

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import SyntaxHighlighter from '../lib/highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Clipboard, ClipboardCheck, ImageIcon } from 'lucide-react';
+import SyntaxHighlighter from '../lib/highlighter';
 import { useAuth } from '../context/useAuth';
 import Avatar from './Avatar';
-import Logo from '../assets/logo.svg?react';
+import BrandMark from './BrandMark';
 
 const MotionDiv = motion.div;
 
@@ -18,7 +18,7 @@ const CodeBlock = ({ className, children }) => {
   // Inline `code` has no language and no line breaks.
   if (!language && !code.includes('\n')) {
     return (
-      <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.9em] before:content-none after:content-none dark:bg-white/10">
+      <code className="rounded bg-ink/10 px-1 py-0.5 font-mono text-[0.88em] before:content-none after:content-none dark:bg-paper/10">
         {children}
       </code>
     );
@@ -35,19 +35,20 @@ const CodeBlock = ({ className, children }) => {
   };
 
   return (
-    <div className="not-prose my-3 overflow-hidden rounded-lg bg-[#282c34] text-sm">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-1.5">
-        <span className="font-sans text-xs text-gray-400">{language || 'text'}</span>
-        <button onClick={handleCopy} className="flex items-center gap-1.5 p-1 text-xs text-gray-300 hover:text-white">
+    <div className="not-prose my-3 overflow-hidden rounded-xl border-2 border-ink bg-ink text-sm dark:border-ink-4">
+      <div className="flex items-center justify-between border-b border-ink-4 px-4 py-1.5">
+        <span className="font-mono text-xs text-haldi">{language || 'text'}</span>
+        <button onClick={handleCopy} className="flex items-center gap-1.5 p-1 font-mono text-xs text-paper/70 hover:text-haldi">
           {copied ? <ClipboardCheck size={14} /> : <Clipboard size={14} />}
-          {copied ? 'Copied' : 'Copy code'}
+          {copied ? 'copied' : 'copy'}
         </button>
       </div>
       <SyntaxHighlighter
         style={oneDark}
         language={language || 'text'}
         PreTag="div"
-        customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}
+        customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontFamily: 'var(--font-mono)' }}
+        codeTagProps={{ style: { fontFamily: 'var(--font-mono)' } }}
       >
         {code}
       </SyntaxHighlighter>
@@ -60,10 +61,10 @@ const Pre = ({ children }) => <>{children}</>;
 
 function Attachment({ message }) {
   if (message.localPreview) {
-    return <img src={message.localPreview} alt={message.attachment?.name || ''} className="mb-2 max-h-64 rounded-lg" />;
+    return <img src={message.localPreview} alt={message.attachment?.name || ''} className="mb-2 max-h-64 rounded-lg border-2 border-ink" />;
   }
   return (
-    <p className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-black/10 px-2 py-1 text-xs dark:bg-white/10">
+    <p className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-ink/10 px-2 py-1 font-mono text-xs">
       <ImageIcon size={14} aria-hidden="true" />
       {message.attachment.name}
     </p>
@@ -76,31 +77,23 @@ export default function MessageBubble({ message }) {
 
   return (
     <MotionDiv
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
       className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
     >
-      {isUser ? (
-        <Avatar user={user} size={32} />
-      ) : (
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-blue-600">
-          <Logo className="h-4 w-5 text-white" aria-hidden="true" />
-        </span>
-      )}
+      {isUser ? <Avatar user={user} size={34} /> : <BrandMark size={34} animated={false} />}
 
       <div
-        className={`min-w-0 max-w-[85%] rounded-2xl px-4 py-2.5 ${
-          isUser ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
+        className={`min-w-0 max-w-[85%] rounded-2xl border-2 px-4 py-2.5 ${
+          isUser
+            ? 'rounded-tr-md border-ink bg-haldi text-ink'
+            : 'rounded-tl-md border-paper-3 bg-paper-2 text-ink dark:border-ink-4 dark:bg-ink-2 dark:text-paper'
         }`}
       >
         {message.attachment && <Attachment message={message} />}
         {message.text && (
-          <div
-            className={`prose prose-sm max-w-none break-words prose-p:my-2 prose-pre:my-0 ${
-              isUser ? 'prose-invert' : 'dark:prose-invert'
-            }`}
-          >
+          <div className={`prose prose-sm prose-rgpt max-w-none break-words prose-p:my-2 prose-pre:my-0 ${isUser ? '' : 'prose-rgpt-themed'}`}>
             <ReactMarkdown components={{ code: CodeBlock, pre: Pre }}>{message.text}</ReactMarkdown>
           </div>
         )}

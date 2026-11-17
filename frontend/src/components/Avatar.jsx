@@ -11,7 +11,7 @@ export default function Avatar({ user, size = 32, className = '' }) {
         src={user.profile_picture_url}
         alt=""
         style={style}
-        className={`shrink-0 rounded-full object-cover ${className}`}
+        className={`shrink-0 rounded-full border-2 border-ink object-cover dark:border-paper/20 ${className}`}
         referrerPolicy="no-referrer"
         onError={() => setFailed(true)}
       />
@@ -21,7 +21,7 @@ export default function Avatar({ user, size = 32, className = '' }) {
   return (
     <div
       style={style}
-      className={`flex shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-semibold text-white ${className}`}
+      className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink bg-chili font-mono text-xs font-bold text-ink ${className}`}
     >
       {initials(user)}
     </div>

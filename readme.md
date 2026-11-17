@@ -3,7 +3,8 @@
 A full-stack AI-powered chat application built with a **Django REST Framework backend** and a **React frontend**, powered by the **Google Gemini API**.  
 It offers real-time chatting, Google authentication, chat history, and a modern responsive UI.
 
-🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)
+🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)  
+👤 **Built by:** Ravi Kumar Gupta (EDWARD7780). [Portfolio](https://edward7780.vercel.app) · [GitHub](https://github.com/EDWARD-012)
 
 The frontend and the Django API both run on Vercel in one project. The API lives under `/api/` on the same domain.
 

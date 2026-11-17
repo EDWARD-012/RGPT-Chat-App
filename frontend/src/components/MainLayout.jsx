@@ -81,9 +81,9 @@ export default function MainLayout() {
   };
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <div className="flex h-dvh overflow-hidden bg-paper text-ink dark:bg-ink dark:text-paper">
       {isSidebarOpen && (
-        <div className="fixed inset-0 z-20 bg-black/40 md:hidden" onClick={() => setIsSidebarOpen(false)} />
+        <div className="fixed inset-0 z-20 bg-ink/50 backdrop-blur-[2px] md:hidden" onClick={() => setIsSidebarOpen(false)} />
       )}
 
       <AppSidebar
@@ -103,11 +103,11 @@ export default function MainLayout() {
         {error && (
           <div
             role="alert"
-            className="flex items-center gap-2 border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/50 dark:text-red-300"
+            className="flex items-center gap-2 border-b border-chili/40 bg-chili/10 px-4 py-2 text-sm"
           >
-            <CircleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <CircleAlert className="h-4 w-4 shrink-0 text-chili" aria-hidden="true" />
             <span className="flex-1">{error}</span>
-            <button onClick={() => setError('')} aria-label="Dismiss" className="rounded p-1 hover:bg-red-100 dark:hover:bg-red-900/50">
+            <button onClick={() => setError('')} aria-label="Dismiss" className="rounded p-1 hover:bg-chili/15">
               <X className="h-4 w-4" />
             </button>
           </div>

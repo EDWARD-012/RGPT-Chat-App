@@ -101,6 +101,15 @@ class SessionAndUserTests(AuthedTestCase):
         self.assertEqual(self.client.get("/api/chats/").data, [])
         self.assertTrue(ChatSession.objects.get(id=chat_id).is_deleted)
 
+    def test_rename_and_pin_keep_the_chat_in_place(self):
+        chat = ChatSession.objects.create(user=self.user)
+        before = ChatSession.objects.get(id=chat.id).updated_at
+        self.client.patch(f"/api/chats/{chat.id}/", {"title": "Renamed"}, format="json")
+        self.client.patch(f"/api/chats/{chat.id}/", {"pinned": True}, format="json")
+        chat.refresh_from_db()
+        self.assertEqual((chat.title, chat.pinned), ("Renamed", True))
+        self.assertEqual(chat.updated_at, before)
+
     def test_cannot_read_someone_elses_chat(self):
         other = User.objects.create_user(username="b@example.com", email="b@example.com")
         chat = ChatSession.objects.create(user=other)
@@ -155,6 +164,18 @@ class MessageTests(AuthedTestCase):
         self.assertEqual([c.role for c in contents], ["user", "model", "user"])
         self.assertEqual(contents[0].parts[0].text, "My name is Ravi")
         self.assertEqual(contents[-1].parts[0].text, "What is my name?")
+
+    @override_settings(CHAT_HISTORY_LIMIT=3)
+    def test_history_window_starts_with_the_user(self):
+        for i in range(2):
+            Message.objects.create(session=self.chat, text=f"question {i}", is_from_user=True)
+            Message.objects.create(session=self.chat, text=f"answer {i}", is_from_user=False)
+        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.client.post(self.url, {"text": "next"}, format="multipart")
+
+        # The last 3 messages are answer 0, question 1, answer 1; answer 0 is dropped.
+        contents = self.gemini.models.generate_content.call_args.kwargs["contents"]
+        self.assertEqual([c.parts[0].text for c in contents], ["question 1", "answer 1", "next"])
 
     def test_image_only_message(self):
         self.gemini.models.generate_content.return_value = gemini_reply("Nice cat")

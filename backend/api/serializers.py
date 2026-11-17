@@ -37,3 +37,12 @@ class ChatSessionDetailSerializer(serializers.ModelSerializer):
         model = ChatSession
         fields = ["id", "title", "messages", "created_at", "updated_at", "pinned"]
         read_only_fields = ["id", "messages", "created_at", "updated_at"]
+
+    def update(self, instance, validated_data):
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        # The sidebar groups chats by updated_at, so only a new message should
+        # move a chat. Saving just these fields leaves updated_at alone when a
+        # chat is renamed or pinned.
+        instance.save(update_fields=list(validated_data))
+        return instance

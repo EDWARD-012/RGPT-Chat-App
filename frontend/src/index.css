@@ -1,56 +1,124 @@
-/* src/index.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
-/* This is our custom scrollbar class, which is fine to keep */
+/* Dark mode follows the .dark class on <html>, toggled from the navbar. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Warm near-black and bone white. */
+  --color-ink: #0f0d0b;
+  --color-ink-2: #181512;
+  --color-ink-3: #231f1a;
+  --color-ink-4: #2f2a23;
+  --color-paper: #f4eee3;
+  --color-paper-2: #ebe3d4;
+  --color-paper-3: #ddd2bf;
+  --color-paper-4: #c8baa2;
+  --color-muted: #8c8272;
+  /* RGPT's accent is haldi (turmeric) yellow. Chili is for small signals like pins and errors. */
+  --color-haldi: #ffc233;
+  --color-haldi-deep: #e9a400;
+  --color-chili: #ff5a1f;
+
+  --font-display: "Unbounded Variable", "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --animate-caret: caret 1.1s steps(1, end) infinite;
+  --animate-marquee: marquee 28s linear infinite;
+  --animate-bob: bob 3.2s ease-in-out infinite;
+
+  @keyframes caret {
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes marquee {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes bob {
+    50% {
+      transform: translateY(-6px) rotate(-2deg);
+    }
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-paper font-sans text-ink antialiased dark:bg-ink dark:text-paper;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Show code exactly as typed: no "<=" turning into "≤". */
+code,
+pre,
+.font-mono {
+  font-variant-ligatures: none;
+}
+
+::selection {
+  @apply bg-haldi text-ink;
+}
+
 .custom-scroll::-webkit-scrollbar {
   width: 8px;
 }
 .custom-scroll::-webkit-scrollbar-thumb {
-  background: #3b3b3b;
+  background: #8c827255;
   border-radius: 10px;
 }
 .custom-scroll::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #8c8272;
 }
 
-html {
-  transition: background-color 0.3s ease, color 0.3s ease;
+/* Hard offset "sticker" shadow used on buttons and cards. */
+.sticker {
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+}
+.dark .sticker {
+  box-shadow: 3px 3px 0 0 var(--color-haldi-deep);
 }
 
-html.dark {
-  background-color: #2a2c30;
-  color: #f1f5f9;
+/* Markdown colours that match the warm palette instead of the plugin's greys. */
+.prose-rgpt {
+  --tw-prose-body: var(--color-ink);
+  --tw-prose-headings: var(--color-ink);
+  --tw-prose-bold: var(--color-ink);
+  --tw-prose-links: var(--color-ink);
+  --tw-prose-code: var(--color-ink);
+  --tw-prose-quotes: var(--color-ink);
+  --tw-prose-bullets: currentColor;
+  --tw-prose-counters: currentColor;
+  --tw-prose-quote-borders: var(--color-chili);
+  --tw-prose-hr: var(--color-paper-4);
+  --tw-prose-th-borders: var(--color-paper-4);
+  --tw-prose-td-borders: var(--color-paper-3);
+}
+.dark .prose-rgpt-themed {
+  --tw-prose-body: var(--color-paper);
+  --tw-prose-headings: var(--color-paper);
+  --tw-prose-bold: var(--color-paper);
+  --tw-prose-links: var(--color-haldi);
+  --tw-prose-code: var(--color-paper);
+  --tw-prose-quotes: var(--color-paper);
+  --tw-prose-hr: var(--color-ink-4);
+  --tw-prose-th-borders: var(--color-ink-4);
+  --tw-prose-td-borders: var(--color-ink-3);
 }
 
-.custom-textarea-color {
-  color: #111827 !important; /* Default (light mode) text color */
-}
-
-.dark .custom-textarea-color {
-  color: #f9fafb !important; /* Dark mode text color */
-}
-
-/* Default light mode */
-.logo {
-  width: 32px;
-  height: 32px;
-  margin-right: 8px;
-  filter: invert(0); /* black logo as is */
-}
-
-@keyframes spin-slow {
-  from {
-    transform: rotate(0deg);
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
-  to {
-    transform: rotate(360deg);
-  }
 }
-
-.animate-spin-slow {
-  animation: spin-slow 2s linear infinite;
-}
-
-

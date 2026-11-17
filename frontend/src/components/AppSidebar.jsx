@@ -1,184 +1,183 @@
 import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { NavLink } from 'react-router-dom';
-import {
-  MessageSquare,
-  LogOut,
-  Plus,
-  Edit2,
-  Pin,
-  PinOff,
-  Check,
-  X,
-  Search,
-} from 'lucide-react';
-import Logo from '../assets/logo.svg?react';
+import { Check, LogOut, MessageSquare, Pencil, Pin, PinOff, Plus, Search, Trash2, X } from 'lucide-react';
+import { useAuth } from '../context/useAuth';
+import Avatar from './Avatar';
+import BrandMark, { Wordmark } from './BrandMark';
 
-// ChatList component remains the same
-const ChatList = ({ chats, onEdit, onPin, editingId, editValue, setEditValue, onEditSave, onEditCancel }) => (
-  <ul className="space-y-1">
-    {chats?.map((chat) => (
-      <li key={chat.id} className="flex items-center group pr-2">
-        <NavLink
-          to={`/chats/${chat.id}`}
-          className={({ isActive }) =>
-            `no-underline text-inherit flex items-center gap-3 p-2 rounded-md transition-colors text-sm flex-1 ${
-              isActive
-                ? 'bg-gray-200 dark:bg-gray-700'
-                : 'hover:bg-gray-200 dark:hover:bg-gray-800'
-            }`
-          }
-        >
-          
-          <MessageSquare size={16} className="flex-shrink-0" />
-          {editingId === chat.id ? (
-            <input
-              className="bg-transparent border-b border-gray-300 dark:border-gray-500 text-gray-900 dark:text-white flex-1 outline-none"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onEditSave(chat.id);
-                if (e.key === 'Escape') onEditCancel();
-              }}
-            />
-          ) : (
-            <span className="truncate text-black dark:text-white">
-              {chat.title || 'New Chat'}
-            </span>
+const iconButton =
+  'rounded-md p-1 text-muted transition hover:bg-paper-3 hover:text-ink dark:hover:bg-ink-4 dark:hover:text-paper';
 
-          )}
-        </NavLink>
-        <div className="flex gap-1 ml-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          {editingId === chat.id ? (
-            <>
-              <button onClick={() => onEditSave(chat.id)} className="text-green-500 hover:text-green-600 p-1"><Check size={14} /></button>
-              <button onClick={onEditCancel} className="text-red-500 hover:text-red-600 p-1"><X size={14} /></button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => onEdit(chat.id, chat.title)} className="text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 p-1"><Edit2 size={14} /></button>
-              <button onClick={() => onPin(chat.id)} className={`p-1 ${ chat.pinned ? 'text-yellow-500' : 'text-gray-500 dark:text-gray-400 hover:text-yellow-500 dark:hover:text-yellow-400' }`}>
-                {chat.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-              </button>
-            </>
-          )}
-        </div>
+function ChatItem({ chat, isEditing, editValue, setEditValue, onStartEdit, onSave, onCancel, onPin, onDelete }) {
+  if (isEditing) {
+    return (
+      <li className="flex items-center gap-1 rounded-lg border-2 border-haldi bg-paper p-1.5 dark:bg-ink-3">
+        <input
+          className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          autoFocus
+          maxLength={200}
+          aria-label="Chat title"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSave(chat.id);
+            if (e.key === 'Escape') onCancel();
+          }}
+        />
+        <button onClick={() => onSave(chat.id)} className={iconButton} aria-label="Save title">
+          <Check size={14} />
+        </button>
+        <button onClick={onCancel} className={iconButton} aria-label="Cancel rename">
+          <X size={14} />
+        </button>
       </li>
-    ))}
-  </ul>
-);
+    );
+  }
 
-export function AppSidebar({
-  allChats,
-  chatGroups,
-  handleNewChat,
-  onRenameChat,
-  onPinChat,
-}) {
+  return (
+    <li className="group flex items-center rounded-lg">
+      <NavLink
+        to={`/chats/${chat.id}`}
+        className={({ isActive }) =>
+          `flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+            isActive
+              ? 'bg-paper font-medium shadow-[inset_3px_0_0_0_var(--color-haldi-deep)] dark:bg-ink-3 dark:shadow-[inset_3px_0_0_0_var(--color-haldi)]'
+              : 'hover:bg-paper/70 dark:hover:bg-ink-3/60'
+          }`
+        }
+      >
+        <MessageSquare size={15} className="shrink-0 text-muted" />
+        <span className="truncate">{chat.title || 'New Chat'}</span>
+      </NavLink>
+      <div className="ml-1 flex shrink-0 gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+        <button onClick={() => onStartEdit(chat)} className={iconButton} aria-label="Rename chat" title="Rename">
+          <Pencil size={14} />
+        </button>
+        <button
+          onClick={() => onPin(chat.id)}
+          className={`${iconButton} ${chat.pinned ? 'text-chili' : ''}`}
+          aria-label={chat.pinned ? 'Unpin chat' : 'Pin chat'}
+          title={chat.pinned ? 'Unpin' : 'Pin'}
+        >
+          {chat.pinned ? <PinOff size={14} /> : <Pin size={14} />}
+        </button>
+        <button onClick={() => onDelete(chat.id)} className={`${iconButton} hover:text-chili`} aria-label="Delete chat" title="Delete">
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </li>
+  );
+}
+
+export function AppSidebar({ open, onClose, allChats, chatGroups, onNewChat, onRenameChat, onPinChat, onDeleteChat }) {
   const { logout, user } = useAuth();
   const [editingId, setEditingId] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [search, setSearch] = useState('');
 
-  const pinnedChats = allChats?.filter((c) => c.pinned) || [];
-
-  const handleEdit = (id, title) => { setEditingId(id); setEditValue(title); };
-  const handleEditSave = (id) => { onRenameChat(id, editValue); setEditingId(null); setEditValue(''); };
-  const handleEditCancel = () => { setEditingId(null); setEditValue(''); };
-
-  const filterChats = (chats) => chats?.filter((c) => c.title.toLowerCase().includes(search.toLowerCase())) || [];
-
-  const renderChatGroup = (title, chats) => {
-    const filtered = filterChats(chats);
-    if (!filtered || filtered.length === 0) return null;
-    return (
-      <div>
-        <p className={`text-xs font-bold px-2 mb-2 ${ title === 'Pinned' ? 'text-yellow-500' : 'text-gray-400 dark:text-gray-500' }`}>
-          {title}
-        </p>
-        <ChatList
-          chats={filtered}
-          onEdit={handleEdit}
-          onPin={onPinChat}
-          editingId={editingId}
-          editValue={editValue}
-          setEditValue={setEditValue}
-          onEditSave={handleEditSave}
-          onEditCancel={handleEditCancel}
-        />
-      </div>
-    );
+  const startEdit = (chat) => {
+    setEditingId(chat.id);
+    setEditValue(chat.title || '');
   };
+  const saveEdit = (id) => {
+    onRenameChat(id, editValue);
+    setEditingId(null);
+  };
+  const cancelEdit = () => setEditingId(null);
+
+  const query = search.trim().toLowerCase();
+  const matches = (chats) => (chats || []).filter((c) => (c.title || '').toLowerCase().includes(query));
+  const unpinned = (chats) => (chats || []).filter((c) => !c.pinned);
+
+  const sections = [
+    ['Pinned', matches(allChats.filter((c) => c.pinned))],
+    ['Today', matches(unpinned(chatGroups.today))],
+    ['Yesterday', matches(unpinned(chatGroups.yesterday))],
+    ['Previous 7 days', matches(unpinned(chatGroups.previous7Days))],
+    ['Older', matches(unpinned(chatGroups.older))],
+  ].filter(([, chats]) => chats.length > 0);
+
+  const displayName = [user?.first_name, user?.last_name].filter(Boolean).join(' ');
 
   return (
-    <div className="w-72 bg-gray-50 dark:bg-gray-900/80 backdrop-blur-md border-r border-gray-200 dark:border-gray-700/50 flex flex-col h-[97vh]">
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700/50 flex items-center gap-2">
-        <Logo className="w-8 h-8 text-gray-800 dark:text-gray-200" />
-        <h1 className="text-lg font-semibold text-gray-900 dark:text-white">RGPT</h1>
+    <aside
+      className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r-2 border-paper-3 bg-paper-2 transition-transform duration-200 dark:border-ink-4 dark:bg-ink-2 md:static md:z-auto ${
+        open ? 'translate-x-0' : '-translate-x-full md:hidden'
+      }`}
+    >
+      <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <BrandMark size={34} className="transition-transform duration-300 hover:-rotate-6" />
+        <Wordmark className="flex-1 text-lg" />
+        <button onClick={onClose} className={`${iconButton} md:hidden`} aria-label="Close sidebar">
+          <X size={18} />
+        </button>
       </div>
 
-      <div className="p-4">
-      <button
-        onClick={handleNewChat}
-        className="flex items-center justify-center gap-2 w-full 
-                  bg-gradient-to-r from-purple-600 to-blue-500 
-                  hover:opacity-90 text-black dark:text-white 
-                  font-medium py-2 rounded-lg transition"
-      >
-        New Chat
-      </button>
-      </div>
-
-      <div className="px-4 pb-2">
-        <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-lg px-3 py-2">
-          <Search size={16} className="text-gray-500" />
+      <div className="space-y-3 px-3 pb-3">
+        <button
+          onClick={onNewChat}
+          className="sticker flex w-full items-center justify-center gap-2 rounded-xl border-2 border-ink bg-haldi py-2.5 font-display text-sm font-bold text-ink transition hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
+        >
+          <Plus size={16} strokeWidth={3} />
+          New chat
+        </button>
+        <label className="flex items-center gap-2 rounded-xl border-2 border-transparent bg-paper px-3 py-2 focus-within:border-haldi-deep dark:bg-ink-3 dark:focus-within:border-haldi">
+          <Search size={15} className="text-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search chats..."
-            className="bg-transparent w-full text-sm text-gray-800 dark:text-gray-200 outline-none placeholder-gray-500"
+            placeholder="Search chats"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
-        </div>
+        </label>
       </div>
 
-      <div className="flex-grow overflow-y-auto p-3 space-y-4">
-        {renderChatGroup('Pinned', pinnedChats)}
-        {renderChatGroup('Today', chatGroups.today?.filter((c) => !c.pinned))}
-        {renderChatGroup('Yesterday', chatGroups.yesterday?.filter((c) => !c.pinned))}
-        {renderChatGroup('Previous 7 Days', chatGroups.previous7Days?.filter((c) => !c.pinned))}
-        {renderChatGroup('Older', chatGroups.older?.filter((c) => !c.pinned))}
-      </div>
-
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img
-            src={user?.profile_picture_url || 'https://i.pravatar.cc/40'}
-            alt="profile"
-            style={{
-              width: 50,
-              borderRadius: '100%',
-              objectFit: 'cover',
-              padding: 7,
-            }}
-            referrerPolicy="no-referrer"
-          />
-
-          <div className="text-sm">
-            <p className="font-medium text-gray-800 dark:text-gray-200 truncate max-w-[180px]">
-              {user?.email}
+      <nav className="custom-scroll flex-1 space-y-5 overflow-y-auto px-3 pb-3">
+        {sections.map(([title, chats]) => (
+          <div key={title}>
+            <p
+              className={`mb-1.5 px-2 font-mono text-[11px] font-semibold uppercase tracking-wider ${
+                title === 'Pinned' ? 'text-chili' : 'text-muted'
+              }`}
+            >
+              {title}
             </p>
+            <ul className="space-y-0.5">
+              {chats.map((chat) => (
+                <ChatItem
+                  key={chat.id}
+                  chat={chat}
+                  isEditing={editingId === chat.id}
+                  editValue={editValue}
+                  setEditValue={setEditValue}
+                  onStartEdit={startEdit}
+                  onSave={saveEdit}
+                  onCancel={cancelEdit}
+                  onPin={onPinChat}
+                  onDelete={onDeleteChat}
+                />
+              ))}
+            </ul>
           </div>
+        ))}
+        {sections.length === 0 && (
+          <p className="px-2 pt-6 text-center font-mono text-xs text-muted">
+            {query ? 'No chats match your search.' : 'No chats yet. Start one above.'}
+          </p>
+        )}
+      </nav>
+
+      <div className="flex items-center gap-3 border-t-2 border-paper-3 p-3 dark:border-ink-4">
+        <Avatar user={user} size={36} />
+        <div className="min-w-0 flex-1 text-sm">
+          {displayName && <p className="truncate font-semibold">{displayName}</p>}
+          <p className="truncate font-mono text-xs text-muted">{user?.email}</p>
         </div>
-        <button
-          onClick={logout}
-          className="text-gray-500 hover:text-red-500 transition"
-        >
+        <button onClick={logout} className={`${iconButton} hover:text-chili`} aria-label="Sign out" title="Sign out">
           <LogOut size={18} />
         </button>
       </div>
-    </div>
+    </aside>
   );
 }
-

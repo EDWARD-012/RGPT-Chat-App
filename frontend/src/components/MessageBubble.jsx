@@ -1,76 +1,103 @@
-import { useAuth } from '../context/AuthContext';
-import Logo from '../assets/logo.svg?react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Clipboard } from 'lucide-react';
-import { useState } from 'react';
+import { Clipboard, ClipboardCheck, ImageIcon } from 'lucide-react';
+import SyntaxHighlighter from '../lib/highlighter';
+import { useAuth } from '../context/useAuth';
+import Avatar from './Avatar';
+import BrandMark from './BrandMark';
 
-// CodeBlock component remains the same
+const MotionDiv = motion.div;
+
 const CodeBlock = ({ className, children }) => {
   const [copied, setCopied] = useState(false);
-  const match = /language-(\w+)/.exec(className || '');
   const code = String(children).replace(/\n$/, '');
+  const language = /language-([\w+#-]+)/.exec(className || '')?.[1];
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Inline `code` has no language and no line breaks.
+  if (!language && !code.includes('\n')) {
+    return (
+      <code className="rounded bg-ink/10 px-1 py-0.5 font-mono text-[0.88em] before:content-none after:content-none dark:bg-paper/10">
+        {children}
+      </code>
+    );
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard access can be blocked; nothing else to do.
+    }
   };
 
-  return match ? (
-    <div className="relative my-2 rounded-lg bg-[#282c34] text-sm">
-      <div className="flex items-center justify-between px-4 py-1.5 border-b border-gray-600">
-        <span className="text-gray-400 text-xs font-sans">{match[1]}</span>
-        <button onClick={handleCopy} className="flex items-center gap-1.5 p-1 text-gray-300 hover:text-white text-xs">
-          <Clipboard size={14} />
-          {copied ? 'Copied!' : 'Copy code'}
+  return (
+    <div className="not-prose my-3 overflow-hidden rounded-xl border-2 border-ink bg-ink text-sm dark:border-ink-4">
+      <div className="flex items-center justify-between border-b border-ink-4 px-4 py-1.5">
+        <span className="font-mono text-xs text-haldi">{language || 'text'}</span>
+        <button onClick={handleCopy} className="flex items-center gap-1.5 p-1 font-mono text-xs text-paper/70 hover:text-haldi">
+          {copied ? <ClipboardCheck size={14} /> : <Clipboard size={14} />}
+          {copied ? 'copied' : 'copy'}
         </button>
       </div>
-      <SyntaxHighlighter style={oneDark} language={match[1]} PreTag="div" customStyle={{ margin: 0, padding: '1rem', background: 'transparent' }}>
+      <SyntaxHighlighter
+        style={oneDark}
+        language={language || 'text'}
+        PreTag="div"
+        customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontFamily: 'var(--font-mono)' }}
+        codeTagProps={{ style: { fontFamily: 'var(--font-mono)' } }}
+      >
         {code}
       </SyntaxHighlighter>
     </div>
-  ) : (
-    <code className={`${className} bg-gray-200 dark:bg-gray-900 rounded-md px-1 py-0.5 text-red-500 dark:text-red-400`}>{children}</code>
   );
 };
+
+// Code blocks draw their own container, so skip the extra <pre>.
+const Pre = ({ children }) => <>{children}</>;
+
+function Attachment({ message }) {
+  if (message.localPreview) {
+    return <img src={message.localPreview} alt={message.attachment?.name || ''} className="mb-2 max-h-64 rounded-lg border-2 border-ink" />;
+  }
+  return (
+    <p className="mb-1 inline-flex items-center gap-1.5 rounded-md bg-ink/10 px-2 py-1 font-mono text-xs">
+      <ImageIcon size={14} aria-hidden="true" />
+      {message.attachment.name}
+    </p>
+  );
+}
 
 export default function MessageBubble({ message }) {
   const { user } = useAuth();
   const isUser = message.is_from_user;
-  
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`flex items-start gap-3 ${isUser ? "justify-end flex-row-reverse" : "justify-start"}`}
+    <MotionDiv
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+      className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`}
     >
-      {/* Avatar */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full overflow-hidden self-start">
-        {isUser ? (
-          <img
-            src={user?.profile_picture_url || 'https://i.pravatar.cc/40'}
-            alt="User"
-            style={{ width: 32, height: 32, margin: 4}}
-            className="rounded-full border border-gray-300"
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-600 to-blue-500 flex items-center justify-center p-1">
-            <Logo style={{ width: 32, height: 32, marginRight: 8}} className="logo" />
+      {isUser ? <Avatar user={user} size={34} /> : <BrandMark size={34} animated={false} />}
+
+      <div
+        className={`min-w-0 max-w-[85%] rounded-2xl border-2 px-4 py-2.5 ${
+          isUser
+            ? 'rounded-tr-md border-ink bg-haldi text-ink'
+            : 'rounded-tl-md border-paper-3 bg-paper-2 text-ink dark:border-ink-4 dark:bg-ink-2 dark:text-paper'
+        }`}
+      >
+        {message.attachment && <Attachment message={message} />}
+        {message.text && (
+          <div className={`prose prose-sm prose-rgpt max-w-none break-words prose-p:my-2 prose-pre:my-0 ${isUser ? '' : 'prose-rgpt-themed'}`}>
+            <ReactMarkdown components={{ code: CodeBlock, pre: Pre }}>{message.text}</ReactMarkdown>
           </div>
         )}
-        
       </div>
-      
-      {/* Message Content */}
-      <div className={`prose dark:prose-invert max-w-none text-gray-900 dark:text-gray-200 p-3 rounded-xl ${isUser ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'}`}>
-        <ReactMarkdown components={{ code: CodeBlock }}>
-          {message.text}
-        </ReactMarkdown>
-      </div>
-    </motion.div>
+    </MotionDiv>
   );
 }
-

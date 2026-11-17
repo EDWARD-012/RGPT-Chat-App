@@ -1,16 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { GoogleOAuthProvider } from '@react-oauth/google';
+import '@fontsource-variable/unbounded';
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource-variable/jetbrains-mono';
 import App from './App.jsx';
 import './index.css';
-import { GoogleOAuthProvider } from '@react-oauth/google';
-import { AuthProvider } from './context/AuthContext.jsx'; // <-- Import AuthProvider
+import { AuthProvider } from './context/AuthContext.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
-      <AuthProvider> {/* <-- Wrap your App */}
-        <App />
-      </AuthProvider>
-    </GoogleOAuthProvider>
+    <ErrorBoundary>
+      <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </GoogleOAuthProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

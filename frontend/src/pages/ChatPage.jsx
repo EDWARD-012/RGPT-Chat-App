@@ -4,7 +4,7 @@ import { CircleAlert, ImagePlus, SendHorizontal, X } from 'lucide-react';
 import TextareaAutosize from 'react-textarea-autosize';
 import TypingLoader from '../components/TypingLoader';
 import MessageBubble from '../components/MessageBubble';
-import Logo from '../assets/logo.svg?react';
+import BrandMark from '../components/BrandMark';
 import api, { errorMessage } from '../services/api';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -156,9 +156,9 @@ export default function ChatPage() {
 
   if (status === 'loading') {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-gray-500 dark:text-gray-400">
-        <Logo className="h-8 w-10 animate-pulse text-violet-600 dark:text-violet-400" aria-hidden="true" />
-        <p className="text-sm">Loading chat...</p>
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted">
+        <BrandMark size={48} className="animate-bob" />
+        <p className="font-mono text-xs">loading chat...</p>
       </div>
     );
   }
@@ -166,10 +166,10 @@ export default function ChatPage() {
   if (status === 'missing' || status === 'error') {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-gray-600 dark:text-gray-300">
+        <p className="text-ink/80 dark:text-paper/80">
           {status === 'missing' ? "This chat doesn't exist or was deleted." : error}
         </p>
-        <Link to="/" className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700">
+        <Link to="/" className="sticker rounded-xl border-2 border-ink bg-haldi px-4 py-2 font-display text-sm font-bold text-ink">
           Back to home
         </Link>
       </div>
@@ -183,9 +183,10 @@ export default function ChatPage() {
       <div className="custom-scroll flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
           {messages.length === 0 && !isSending && (
-            <div className="pt-16 text-center text-gray-500 dark:text-gray-400">
-              <p className="text-lg font-medium text-gray-700 dark:text-gray-200">Start chatting with RGPT</p>
-              <p className="mt-1 text-sm">Type a message below, or attach an image and ask about it.</p>
+            <div className="pt-16 text-center">
+              <BrandMark size={56} className="mx-auto animate-bob" />
+              <p className="mt-5 font-display text-xl font-bold">Bolo, kya poochna hai?</p>
+              <p className="mt-1.5 text-sm text-muted">Type a message below, or attach an image and ask about it.</p>
             </div>
           )}
 
@@ -195,10 +196,8 @@ export default function ChatPage() {
 
           {isSending && (
             <div className="flex items-start gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-blue-600">
-                <Logo className="h-4 w-5 text-white" aria-hidden="true" />
-              </span>
-              <div className="rounded-2xl bg-gray-100 px-3 py-2 dark:bg-gray-800">
+              <BrandMark size={34} />
+              <div className="rounded-2xl rounded-tl-md border-2 border-paper-3 bg-paper-2 px-3 py-1.5 dark:border-ink-4 dark:bg-ink-2">
                 <TypingLoader />
               </div>
             </div>
@@ -207,14 +206,14 @@ export default function ChatPage() {
         </div>
       </div>
 
-      <div className="border-t border-gray-200 bg-white/90 px-4 pb-4 pt-3 backdrop-blur dark:border-gray-800 dark:bg-gray-950/80">
+      <div className="px-4 pb-4 pt-2">
         <div className="mx-auto max-w-3xl">
           {error && (
             <div
               role="alert"
-              className="mb-2 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-300"
+              className="mb-2 flex items-start gap-2 rounded-xl border-2 border-chili/50 bg-chili/10 px-3 py-2 text-sm"
             >
-              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-chili" aria-hidden="true" />
               <span className="flex-1">{error}</span>
               <button onClick={() => setError('')} aria-label="Dismiss error">
                 <X className="h-4 w-4" />
@@ -223,12 +222,12 @@ export default function ChatPage() {
           )}
 
           {filePreview && (
-            <div className="mb-2 inline-flex items-center gap-2 rounded-lg border border-gray-200 p-1.5 pr-2 dark:border-gray-700">
-              <img src={filePreview} alt="" className="h-12 w-12 rounded object-cover" />
-              <span className="max-w-[12rem] truncate text-sm text-gray-600 dark:text-gray-300">{file.name}</span>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-xl border-2 border-ink bg-paper-2 p-1.5 pr-2 dark:border-ink-4 dark:bg-ink-2">
+              <img src={filePreview} alt="" className="h-12 w-12 rounded-lg object-cover" />
+              <span className="max-w-[12rem] truncate font-mono text-xs">{file.name}</span>
               <button
                 onClick={clearFile}
-                className="rounded p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="rounded p-1 text-muted hover:bg-paper-3 hover:text-ink dark:hover:bg-ink-4 dark:hover:text-paper"
                 aria-label="Remove image"
               >
                 <X className="h-4 w-4" />
@@ -238,12 +237,12 @@ export default function ChatPage() {
 
           <form
             onSubmit={handleSubmit}
-            className="flex items-end gap-2 rounded-2xl border border-gray-300 bg-gray-50 p-2 transition focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/30 dark:border-gray-700 dark:bg-gray-900"
+            className="sticker flex items-end gap-2 rounded-2xl border-2 border-ink bg-paper-2 p-2 transition focus-within:-translate-y-0.5 dark:border-ink-4 dark:bg-ink-2 dark:focus-within:border-haldi"
           >
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="rounded-full p-2 text-gray-500 transition hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-800"
+              className="rounded-xl p-2 text-muted transition hover:bg-paper-3 hover:text-ink dark:hover:bg-ink-4 dark:hover:text-paper"
               aria-label="Attach an image"
               title="Attach an image"
             >
@@ -270,18 +269,18 @@ export default function ChatPage() {
               minRows={1}
               maxRows={8}
               autoFocus
-              className="flex-1 resize-none bg-transparent px-1 py-2 text-gray-900 outline-none placeholder:text-gray-500 dark:text-gray-100"
+              className="flex-1 resize-none bg-transparent px-1 py-2 outline-none placeholder:text-muted"
             />
             <button
               type="submit"
               disabled={!canSend}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-600 text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-ink bg-haldi text-ink transition hover:-rotate-6 disabled:cursor-not-allowed disabled:rotate-0 disabled:border-transparent disabled:bg-paper-3 disabled:text-muted dark:disabled:bg-ink-4"
               aria-label="Send message"
             >
               <SendHorizontal size={18} />
             </button>
           </form>
-          <p className="mt-2 text-center text-xs text-gray-500 dark:text-gray-500">
+          <p className="mt-2.5 text-center font-mono text-[11px] text-muted">
             Enter to send, Shift + Enter for a new line. RGPT can get things wrong.
           </p>
         </div>

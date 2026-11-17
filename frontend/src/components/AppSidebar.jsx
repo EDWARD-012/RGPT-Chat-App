@@ -3,14 +3,15 @@ import { NavLink } from 'react-router-dom';
 import { Check, LogOut, MessageSquare, Pencil, Pin, PinOff, Plus, Search, Trash2, X } from 'lucide-react';
 import { useAuth } from '../context/useAuth';
 import Avatar from './Avatar';
-import Logo from '../assets/logo.svg?react';
+import BrandMark, { Wordmark } from './BrandMark';
 
-const iconButton = 'rounded p-1 text-gray-500 transition hover:bg-gray-200 dark:text-gray-400 dark:hover:bg-gray-700';
+const iconButton =
+  'rounded-md p-1 text-muted transition hover:bg-paper-3 hover:text-ink dark:hover:bg-ink-4 dark:hover:text-paper';
 
 function ChatItem({ chat, isEditing, editValue, setEditValue, onStartEdit, onSave, onCancel, onPin, onDelete }) {
   if (isEditing) {
     return (
-      <li className="flex items-center gap-1 rounded-md bg-gray-200 p-1.5 dark:bg-gray-800">
+      <li className="flex items-center gap-1 rounded-lg border-2 border-haldi bg-paper p-1.5 dark:bg-ink-3">
         <input
           className="min-w-0 flex-1 bg-transparent px-1 text-sm outline-none"
           value={editValue}
@@ -23,7 +24,7 @@ function ChatItem({ chat, isEditing, editValue, setEditValue, onStartEdit, onSav
             if (e.key === 'Escape') onCancel();
           }}
         />
-        <button onClick={() => onSave(chat.id)} className={`${iconButton} text-green-600`} aria-label="Save title">
+        <button onClick={() => onSave(chat.id)} className={iconButton} aria-label="Save title">
           <Check size={14} />
         </button>
         <button onClick={onCancel} className={iconButton} aria-label="Cancel rename">
@@ -34,16 +35,18 @@ function ChatItem({ chat, isEditing, editValue, setEditValue, onStartEdit, onSav
   }
 
   return (
-    <li className="group flex items-center rounded-md">
+    <li className="group flex items-center rounded-lg">
       <NavLink
         to={`/chats/${chat.id}`}
         className={({ isActive }) =>
-          `flex min-w-0 flex-1 items-center gap-2.5 rounded-md px-2 py-2 text-sm transition-colors ${
-            isActive ? 'bg-gray-200 dark:bg-gray-800' : 'hover:bg-gray-200/70 dark:hover:bg-gray-800/70'
+          `flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors ${
+            isActive
+              ? 'bg-paper font-medium shadow-[inset_3px_0_0_0_var(--color-haldi-deep)] dark:bg-ink-3 dark:shadow-[inset_3px_0_0_0_var(--color-haldi)]'
+              : 'hover:bg-paper/70 dark:hover:bg-ink-3/60'
           }`
         }
       >
-        <MessageSquare size={15} className="shrink-0 text-gray-500 dark:text-gray-400" />
+        <MessageSquare size={15} className="shrink-0 text-muted" />
         <span className="truncate">{chat.title || 'New Chat'}</span>
       </NavLink>
       <div className="ml-1 flex shrink-0 gap-0.5 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
@@ -52,18 +55,13 @@ function ChatItem({ chat, isEditing, editValue, setEditValue, onStartEdit, onSav
         </button>
         <button
           onClick={() => onPin(chat.id)}
-          className={`${iconButton} ${chat.pinned ? 'text-amber-500 dark:text-amber-400' : ''}`}
+          className={`${iconButton} ${chat.pinned ? 'text-chili' : ''}`}
           aria-label={chat.pinned ? 'Unpin chat' : 'Pin chat'}
           title={chat.pinned ? 'Unpin' : 'Pin'}
         >
           {chat.pinned ? <PinOff size={14} /> : <Pin size={14} />}
         </button>
-        <button
-          onClick={() => onDelete(chat.id)}
-          className={`${iconButton} hover:text-red-600 dark:hover:text-red-400`}
-          aria-label="Delete chat"
-          title="Delete"
-        >
+        <button onClick={() => onDelete(chat.id)} className={`${iconButton} hover:text-chili`} aria-label="Delete chat" title="Delete">
           <Trash2 size={14} />
         </button>
       </div>
@@ -103,46 +101,44 @@ export function AppSidebar({ open, onClose, allChats, chatGroups, onNewChat, onR
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-gray-200 bg-gray-50 transition-transform duration-200 dark:border-gray-800 dark:bg-gray-900 md:static md:z-auto ${
+      className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r-2 border-paper-3 bg-paper-2 transition-transform duration-200 dark:border-ink-4 dark:bg-ink-2 md:static md:z-auto ${
         open ? 'translate-x-0' : '-translate-x-full md:hidden'
       }`}
     >
-      <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-800">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-600 to-blue-600">
-          <Logo className="h-4 w-5 text-white" aria-hidden="true" />
-        </span>
-        <span className="flex-1 text-lg font-semibold">RGPT</span>
+      <div className="flex items-center gap-2.5 px-4 py-3.5">
+        <BrandMark size={34} className="transition-transform duration-300 hover:-rotate-6" />
+        <Wordmark className="flex-1 text-lg" />
         <button onClick={onClose} className={`${iconButton} md:hidden`} aria-label="Close sidebar">
           <X size={18} />
         </button>
       </div>
 
-      <div className="space-y-3 p-3">
+      <div className="space-y-3 px-3 pb-3">
         <button
           onClick={onNewChat}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 py-2 font-medium text-white shadow-sm transition hover:opacity-90"
+          className="sticker flex w-full items-center justify-center gap-2 rounded-xl border-2 border-ink bg-haldi py-2.5 font-display text-sm font-bold text-ink transition hover:-translate-y-0.5 active:translate-y-0 active:shadow-none"
         >
-          <Plus size={16} />
+          <Plus size={16} strokeWidth={3} />
           New chat
         </button>
-        <label className="flex items-center gap-2 rounded-lg bg-gray-200/70 px-3 py-2 dark:bg-gray-800">
-          <Search size={15} className="text-gray-500" />
+        <label className="flex items-center gap-2 rounded-xl border-2 border-transparent bg-paper px-3 py-2 focus-within:border-haldi-deep dark:bg-ink-3 dark:focus-within:border-haldi">
+          <Search size={15} className="text-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search chats"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-gray-500"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted"
           />
         </label>
       </div>
 
-      <nav className="custom-scroll flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+      <nav className="custom-scroll flex-1 space-y-5 overflow-y-auto px-3 pb-3">
         {sections.map(([title, chats]) => (
           <div key={title}>
             <p
-              className={`mb-1 px-2 text-xs font-semibold ${
-                title === 'Pinned' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500'
+              className={`mb-1.5 px-2 font-mono text-[11px] font-semibold uppercase tracking-wider ${
+                title === 'Pinned' ? 'text-chili' : 'text-muted'
               }`}
             >
               {title}
@@ -166,19 +162,19 @@ export function AppSidebar({ open, onClose, allChats, chatGroups, onNewChat, onR
           </div>
         ))}
         {sections.length === 0 && (
-          <p className="px-2 pt-4 text-center text-sm text-gray-500">
+          <p className="px-2 pt-6 text-center font-mono text-xs text-muted">
             {query ? 'No chats match your search.' : 'No chats yet. Start one above.'}
           </p>
         )}
       </nav>
 
-      <div className="flex items-center gap-3 border-t border-gray-200 p-3 dark:border-gray-800">
+      <div className="flex items-center gap-3 border-t-2 border-paper-3 p-3 dark:border-ink-4">
         <Avatar user={user} size={36} />
         <div className="min-w-0 flex-1 text-sm">
-          {displayName && <p className="truncate font-medium">{displayName}</p>}
-          <p className="truncate text-gray-500 dark:text-gray-400">{user?.email}</p>
+          {displayName && <p className="truncate font-semibold">{displayName}</p>}
+          <p className="truncate font-mono text-xs text-muted">{user?.email}</p>
         </div>
-        <button onClick={logout} className={`${iconButton} hover:text-red-600`} aria-label="Sign out" title="Sign out">
+        <button onClick={logout} className={`${iconButton} hover:text-chili`} aria-label="Sign out" title="Sign out">
           <LogOut size={18} />
         </button>
       </div>

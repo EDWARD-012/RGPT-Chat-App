@@ -165,6 +165,14 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(contents[0].parts[0].text, "My name is Ravi")
         self.assertEqual(contents[-1].parts[0].text, "What is my name?")
 
+    def test_system_prompt_is_sent(self):
+        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.client.post(self.url, {"text": "Who is EDWARD7780?"}, format="multipart")
+
+        prompt = self.gemini.models.generate_content.call_args.kwargs["config"].system_instruction
+        self.assertIn("Who is EDWARD7780?", prompt)
+        self.assertIn("Portfolio: https://edward7780.vercel.app", prompt)
+
     @override_settings(CHAT_HISTORY_LIMIT=3)
     def test_history_window_starts_with_the_user(self):
         for i in range(2):

@@ -163,6 +163,8 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("VITE_GO
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+# Tried in order when the main model is rate limited or overloaded.
+GEMINI_FALLBACK_MODELS = env_list("GEMINI_FALLBACK_MODELS") or ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
 
 # How many earlier messages from the same chat are sent to Gemini as context.
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "30"))

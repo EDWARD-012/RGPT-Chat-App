@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest import mock
 
+import httpx2
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from google.genai import errors as genai_errors
@@ -236,6 +237,34 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(res.status_code, 502)
         self.assertIn("busy", res.data["error"])
         self.assertEqual(Message.objects.count(), 0)
+
+    def test_slow_model_falls_back_with_a_timeout(self):
+        self.gemini.models.generate_content.side_effect = [
+            httpx2.ReadTimeout("timed out"),
+            gemini_reply("Reply from the fallback"),
+        ]
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["bot_message"]["text"], "Reply from the fallback")
+        # Every call carries a timeout, so a stuck model can't use up the whole request.
+        timeouts = [c.kwargs["config"].http_options.timeout for c in self.gemini.models.generate_content.call_args_list]
+        self.assertTrue(all(t and t <= 48_000 for t in timeouts))
+
+    def test_no_model_answers_in_time(self):
+        self.gemini.models.generate_content.side_effect = httpx2.ReadTimeout("timed out")
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 504)
+        self.assertIn("taking too long", res.data["error"])
+        self.assertEqual(Message.objects.count(), 0)
+
+    @override_settings(GEMINI_THINKING_LEVEL="LOW")
+    def test_optional_thinking_level(self):
+        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.client.post(self.url, {"text": "hi"}, format="multipart")
+        config = self.gemini.models.generate_content.call_args.kwargs["config"]
+        self.assertEqual(config.thinking_config.thinking_level, "LOW")
 
     def test_bad_request_does_not_try_fallback(self):
         self.gemini.models.generate_content.side_effect = gemini_error(400, "INVALID_ARGUMENT")

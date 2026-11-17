@@ -1,8 +1,10 @@
 import logging
 import os
 import re
+import time
 from datetime import timedelta
 
+import httpx2
 from django.conf import settings
 from django.db import connection, transaction
 from django.http import JsonResponse
@@ -223,21 +225,51 @@ FALLBACK_CODES = {429, 500, 502, 503, 504}
 OVERLOADED_CODES = {500, 502, 503, 504}
 
 
+class GeminiTimeout(Exception):
+    """No model answered within GEMINI_TOTAL_TIMEOUT."""
+
+
+def gemini_config(timeout):
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_INSTRUCTION,
+        http_options=types.HttpOptions(timeout=int(timeout * 1000)),
+    )
+    if settings.GEMINI_THINKING_LEVEL:
+        config.thinking_config = types.ThinkingConfig(thinking_level=settings.GEMINI_THINKING_LEVEL)
+    return config
+
+
 def generate_reply(contents):
-    """Return (model, reply text), trying the fallback models if the main one is unavailable."""
+    """Return (model, reply text), trying the fallback models if the main one is unavailable or too slow."""
     models = list(dict.fromkeys([settings.GEMINI_MODEL, *settings.GEMINI_FALLBACK_MODELS]))
+    deadline = time.monotonic() + settings.GEMINI_TOTAL_TIMEOUT
     for index, model in enumerate(models):
+        is_last = index == len(models) - 1
+        remaining = deadline - time.monotonic()
+        if remaining < 1:
+            raise GeminiTimeout
+        # The main model gets the most time. After that, the time left is
+        # shared between the models still to try.
+        timeout = min(settings.GEMINI_ATTEMPT_TIMEOUT, remaining) if index == 0 else remaining / (len(models) - index)
+        started = time.monotonic()
         try:
             response = get_gemini_client().models.generate_content(
-                model=model,
-                contents=contents,
-                config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+                model=model, contents=contents, config=gemini_config(timeout)
             )
-            return model, (response.text or "").strip()
         except genai_errors.APIError as exc:
-            logger.error("Gemini model %s failed (%s %s): %s", model, exc.code, exc.status, exc.message)
-            if exc.code not in FALLBACK_CODES or index == len(models) - 1:
+            logger.error(
+                "Gemini model %s failed after %.1fs (%s %s): %s",
+                model, time.monotonic() - started, exc.code, exc.status, exc.message,
+            )
+            if exc.code not in FALLBACK_CODES or is_last:
                 raise
+        except httpx2.TransportError as exc:
+            logger.error("Gemini model %s gave no reply after %.1fs: %r", model, time.monotonic() - started, exc)
+            if is_last:
+                raise GeminiTimeout from exc
+        else:
+            logger.info("Gemini model %s replied in %.1fs", model, time.monotonic() - started)
+            return model, (response.text or "").strip()
 
 
 def make_title(text, upload):
@@ -313,6 +345,11 @@ class MessageListCreateView(generics.ListCreateAPIView):
             else:
                 message = "RGPT couldn't get a reply from Gemini. Please try again."
             return error(message, status.HTTP_502_BAD_GATEWAY)
+        except GeminiTimeout:
+            return error(
+                "Gemini is taking too long to reply right now. Please try again in a minute.",
+                status.HTTP_504_GATEWAY_TIMEOUT,
+            )
         except Exception:
             logger.exception("Gemini request failed")
             return error("RGPT couldn't get a reply from Gemini. Please try again.", status.HTTP_502_BAD_GATEWAY)

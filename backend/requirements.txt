@@ -6,5 +6,7 @@ psycopg2-binary==2.9.13
 google-auth==2.62.2
 requests==2.34.2
 google-genai==3.4.0
+# The HTTP client google-genai uses. Listed because views.py catches its timeouts.
+httpx2==2.16.2
 whitenoise==6.12.0
 python-dotenv==1.2.4

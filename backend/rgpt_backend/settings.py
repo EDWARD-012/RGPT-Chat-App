@@ -165,6 +165,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
 # Tried in order when the main model is rate limited or overloaded.
 GEMINI_FALLBACK_MODELS = env_list("GEMINI_FALLBACK_MODELS") or ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
+# The SDK waits forever by default, and a stuck call used to run into Vercel's
+# 60 second function limit before the fallback models were tried. Each model
+# now gets GEMINI_ATTEMPT_TIMEOUT seconds and all of them together get
+# GEMINI_TOTAL_TIMEOUT, which leaves room for the rest of the request.
+GEMINI_ATTEMPT_TIMEOUT = float(os.environ.get("GEMINI_ATTEMPT_TIMEOUT", "25"))
+GEMINI_TOTAL_TIMEOUT = float(os.environ.get("GEMINI_TOTAL_TIMEOUT", "48"))
+# Optional, e.g. LOW or MINIMAL for faster replies on models that support it.
+GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "").strip().upper() or None
 
 # How many earlier messages from the same chat are sent to Gemini as context.
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "30"))

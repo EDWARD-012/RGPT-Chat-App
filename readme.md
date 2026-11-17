@@ -1,65 +1,105 @@
-# 💬 RGPT - A Personalized AI Chat Application
+<p align="center">
+  <img src="frontend/public/favicon.svg" width="96" alt="RGPT logo: a yellow chat bubble with an R and a cursor" />
+</p>
 
-A full-stack AI-powered chat application built with a **Django REST Framework backend** and a **React frontend**, powered by the **Google Gemini API**.  
-It offers real-time chatting, Google authentication, chat history, and a modern responsive UI.
+<h1 align="center">RGPT</h1>
 
-🔗 **Live Demo:** [RGPT Chat App](https://rgpt-chat-app.vercel.app/)  
-👤 **Built by:** Ravi Kumar Gupta (EDWARD7780). [Portfolio](https://edward7780.vercel.app) · [GitHub](https://github.com/EDWARD-012)
+<p align="center">
+  A coding buddy that answers in Hinglish. Paste an error, ask it to explain a concept or send a screenshot.<br />
+  Built with React, Django REST Framework and Google Gemini, and deployed on Vercel.
+</p>
 
-The frontend and the Django API both run on Vercel in one project. The API lives under `/api/` on the same domain.
+<p align="center">
+  <a href="https://rgpt-chat-app.vercel.app"><b>Live demo</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://edward7780.vercel.app">Portfolio</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/EDWARD-012">GitHub</a>
+</p>
 
----
+<p align="center">
+  <img src="https://img.shields.io/badge/React_19-0f0d0b?style=flat-square&logo=react&logoColor=ffc233" alt="React 19" />
+  <img src="https://img.shields.io/badge/Django_5.2-0f0d0b?style=flat-square&logo=django&logoColor=ffc233" alt="Django 5.2" />
+  <img src="https://img.shields.io/badge/Gemini_API-0f0d0b?style=flat-square&logo=googlegemini&logoColor=ffc233" alt="Gemini API" />
+  <img src="https://img.shields.io/badge/Tailwind_CSS_4-0f0d0b?style=flat-square&logo=tailwindcss&logoColor=ffc233" alt="Tailwind CSS 4" />
+  <img src="https://img.shields.io/badge/Vercel-0f0d0b?style=flat-square&logo=vercel&logoColor=ffc233" alt="Vercel" />
+</p>
 
-## 🚀 Features
+<p align="center">
+  <img src="docs/screenshots/landing.png" alt="RGPT landing page with the headline 'Bug mila? Pooch le.', a Google sign-in button and an example chat" />
+</p>
 
-- 💬 Real-time chat interface  
-- 🔐 User authentication via **Google Sign-In**  
-- 💾 Persistent, user-specific chat histories  
-- 🧠 AI responses powered by the **Google Gemini API**, with earlier messages in the chat sent as context  
-- 🖼️ Image analysis capabilities  
-- 🧩 Markdown & code block rendering for AI responses  
-- 📁 Collapsible sidebar with chat management (rename, pin, delete)  
-- 🌗 Light/Dark theme toggle  
-- ⚙️ REST API communication between React and Django  
+## A quick look
 
----
+The landing page plays a short example chat by itself, so visitors can see what RGPT does before they sign in.
 
-## 🛠️ Tech Stack
+<p align="center">
+  <img src="docs/screenshots/demo.gif" width="460" alt="Example chat typing itself out: a segfault question, an explanation of recursion, and 'Who made you?'" />
+</p>
 
-### **Backend**
-- Python / Django / Django REST Framework  
-- Google Gemini API through the `google-genai` SDK  
-- Google ID token verification with `google-auth`, DRF token auth for the API  
-- Postgres (Neon) in production, SQLite locally  
-- Deployed on **Vercel** as a Python function
+After signing in with Google, chats are saved to your account. There's a light theme and a dark one.
 
-### **Frontend**
-- JavaScript / React / Vite  
-- Tailwind CSS for styling  
-- `@react-oauth/google` for login  
-- `react-router-dom` for routing  
-- `axios` for API communication  
-- Deployed on **Vercel**
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/chat-light.png" alt="A chat in the light theme with a C++ code block" /></td>
+    <td width="50%"><img src="docs/screenshots/chat-dark.png" alt="The same chat in the dark theme" /></td>
+  </tr>
+</table>
 
----
+It works on a phone too.
 
-## 📦 Setup and Installation
+<p align="center">
+  <img src="docs/screenshots/mobile-landing.png" width="260" alt="Landing page on a phone" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/mobile-chat.png" width="260" alt="A chat on a phone in the dark theme" />
+</p>
 
-### 1️⃣ Clone the Repository
+<sub>The chat screenshots use a sample conversation on a local build.</sub>
+
+## What it does
+
+- Replies in Hinglish and writes code in C++ unless you ask for another language. Code blocks are highlighted and have a copy button.
+- Takes an image with or without text, so you can send a screenshot of an error and ask what's wrong. Images can be up to 4 MB.
+- Sends the earlier messages of a chat along with each new one, so follow-up questions work.
+- Saves chats per Google account. You can pin, rename, search and delete them from the sidebar, and new chats are named after their first message.
+- Falls back to other Gemini models when the main one is busy or rate limited.
+- Limits each user to 40 messages an hour so the public demo can't use up the Gemini quota.
+
+## How it works
+
+```mermaid
+flowchart LR
+    U[Browser] --> V{Vercel}
+    V -- "/api, /admin, /static" --> D["Django + DRF<br/>(Python function)"]
+    V -- "everything else" --> R["React app<br/>(Vite build)"]
+    D --> G[Gemini API]
+    D --> P[(Postgres on Neon)]
+```
+
+Both parts live in one Vercel project, on one domain, so there's no CORS setup in production. The browser gets an ID token from Google Sign-In and sends it to `/api/auth/google/`. Django checks it with `google-auth` and returns a DRF token that the app sends with every request after that.
+
+When you send a message, Django loads the recent history of that chat (30 messages by default), sends it to Gemini with the system prompt, and saves your message and the reply together once the reply arrives. If Gemini fails, nothing is saved and the app shows an error.
+
+## Tech stack
+
+**Frontend:** React 19, Vite 7, Tailwind CSS 4, Framer Motion, react-markdown with react-syntax-highlighter, `@react-oauth/google`, react-router and axios. Fonts are Unbounded, Bricolage Grotesque and JetBrains Mono, self-hosted through Fontsource.
+
+**Backend:** Python 3.12, Django 5.2, Django REST Framework, the `google-genai` SDK, `google-auth`, `dj-database-url` and WhiteNoise.
+
+**Hosting:** Vercel Services for both parts, and Postgres on Neon from the Vercel Marketplace. Locally it uses SQLite.
+
+## Run it locally
+
+Clone the repo:
+
 ```bash
 git clone https://github.com/EDWARD-012/RGPT-Chat-App.git
 cd RGPT-Chat-App
 ```
 
----
+Copy `.env.example` to `.env` in the repo root and fill it in. The backend and the Vite dev server both read this file. Leave `DATABASE_URL` empty to use SQLite.
 
-### 2️⃣ Environment variables
-
-Copy `.env.example` to `.env` in the repo root and fill it in. Both the backend and the Vite dev server read this one file. Leave `DATABASE_URL` empty to use SQLite.
-
----
-
-### 3️⃣ Backend Setup (Python 3.12)
+Start the backend (Python 3.12):
 
 ```bash
 cd backend
@@ -72,9 +112,7 @@ python manage.py runserver
 
 Run the tests with `python manage.py test api`.
 
----
-
-### 4️⃣ Frontend Setup
+In a second terminal, start the frontend:
 
 ```bash
 cd frontend
@@ -84,9 +122,7 @@ npm run dev
 
 The Vite dev server proxies `/api`, `/admin` and `/static` to Django on port 8000, so open http://localhost:5173. Add `http://localhost:5173` to the authorized JavaScript origins of your Google OAuth client for sign-in to work locally.
 
----
-
-## ▲ Deploying on Vercel
+## Deploying on Vercel
 
 `vercel.json` defines two Vercel Services in one project: `frontend/` is built with Vite and `backend/` runs Django as a Python function. Requests to `/api/*`, `/admin*` and `/static/*` go to Django and everything else goes to the React app. Each build runs `migrate` when `DATABASE_URL` is set.
 
@@ -99,64 +135,33 @@ In the Vercel project settings, the Root Directory is the repo root and the Fram
 | `VITE_GOOGLE_CLIENT_ID` | OAuth web client ID, used by the frontend and the backend |
 | `DATABASE_URL` | Added by the Neon integration when you connect a database |
 
-`GET /api/health/` reports which of these the deployment can see, without showing their values.
+`GET /api/health/` reports which of these the deployment can see, without showing their values. The optional settings are listed in `.env.example`.
 
 Every Vercel origin that shows the sign-in button (the production domain and any preview URL you test on) has to be listed under Authorized JavaScript origins for the OAuth client in Google Cloud Console.
 
----
-
-## 🗂️ Project Structure
+## Project structure
 
 ```
 RGPT-Chat-App/
-├── frontend/         # React + Vite + Tailwind frontend
+├── frontend/          React + Vite + Tailwind app
+│   ├── public/        Favicon (the RGPT logo)
 │   └── src/
-├── backend/          # Django + DRF backend
-│   ├── api/          # Models, views, serializers, tests
-│   └── rgpt_backend/ # Settings and URLs
-├── vercel.json       # Vercel Services config
-├── .env.example
-└── readme.md
+├── backend/           Django + DRF API
+│   ├── api/           Models, views, serializers, tests
+│   └── rgpt_backend/  Settings and URLs
+├── docs/screenshots/  Images used in this README
+├── vercel.json        Vercel Services config
+└── .env.example
 ```
 
----
+## Contributing
 
-## 🌟 Future Improvements
+Pull requests are welcome. For bigger changes, open an issue first so we can talk about it.
 
-* ✨ UI redesign for a more polished and smooth experience
-* 🎨 Improved theme animations and transitions
-* 💬 Enhanced chat bubble design and message rendering
-* 📱 Better mobile responsiveness
-* ⚡ Performance optimization for faster load times
+## License
+
+Released under the MIT License.
 
 ---
 
-## 📸 Screenshots
-
-
-<img width="1425" height="922" alt="Screenshot 2025-10-14 180245" src="https://github.com/user-attachments/assets/78e9178b-f306-4a97-9ed1-0fec6fa82d6c" />
-
-<img width="2879" height="1333" alt="Screenshot 2025-10-14 180420" src="https://github.com/user-attachments/assets/fb6c18ee-485e-45bd-8542-70b9d388028e" />
-
-<img width="2879" height="1349" alt="Screenshot 2025-10-14 180436" src="https://github.com/user-attachments/assets/43ebcc44-7efa-4970-87ad-7a4cd3fd717f" />
-
-<img width="2079" height="425" alt="Screenshot 2025-10-14 180449" src="https://github.com/user-attachments/assets/46338b7f-a917-47bb-a353-a0dcef417bd4" />
-
-<img width="2094" height="409" alt="Screenshot 2025-10-14 180458" src="https://github.com/user-attachments/assets/dbc03a98-c57c-454c-9c6b-4b8cf0acb8ce" />
-
-<img width="2879" height="1350" alt="Screenshot 2025-10-14 180618" src="https://github.com/user-attachments/assets/52622bf0-e139-43bd-9a2e-fc0a7ff2c572" />
-
----
-
-## 🤝 Contributing
-
-Pull requests are welcome!
-For major changes, please open an issue first to discuss what you’d like to improve.
-
----
-
-## 📜 License
-
-This project is open-source and available under the [MIT License](LICENSE).
-
-
+Built by Ravi Kumar Gupta ([EDWARD7780](https://edward7780.vercel.app)).

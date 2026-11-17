@@ -9,6 +9,11 @@ import api, { errorMessage } from '../services/api';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 const ACCEPTED_IMAGES = 'image/png,image/jpeg,image/webp,image/heic,image/heif';
+// The server gives up on Gemini before Vercel's 60 second limit, so this is
+// only a backstop for a request that never comes back.
+const SEND_TIMEOUT_MS = 70_000;
+// After this long without a reply, tell the user it's still working.
+const SLOW_REPLY_MS = 12_000;
 
 export default function ChatPage() {
   const { chatId } = useParams();
@@ -22,6 +27,7 @@ export default function ChatPage() {
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [isSending, setIsSending] = useState(false);
+  const [isSlow, setIsSlow] = useState(false);
   const [error, setError] = useState('');
   const endRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -31,6 +37,15 @@ export default function ChatPage() {
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isSending]);
+
+  useEffect(() => {
+    if (!isSending) {
+      setIsSlow(false);
+      return;
+    }
+    const timer = setTimeout(() => setIsSlow(true), SLOW_REPLY_MS);
+    return () => clearTimeout(timer);
+  }, [isSending]);
 
   // Load the chat whenever the URL changes.
   useEffect(() => {
@@ -42,7 +57,8 @@ export default function ChatPage() {
       .get(`chats/${chatId}/`)
       .then((res) => {
         if (cancelled) return;
-        setMessages(res.data.messages || []);
+        if (!Array.isArray(res.data?.messages)) throw new Error('Unexpected response for this chat');
+        setMessages(res.data.messages);
         setStatus('ready');
       })
       .catch((err) => {
@@ -110,7 +126,8 @@ export default function ChatPage() {
       if (attachment) form.append('file_upload', attachment);
 
       try {
-        const res = await api.post(`chats/${chatId}/messages/`, form);
+        const res = await api.post(`chats/${chatId}/messages/`, form, { timeout: SEND_TIMEOUT_MS });
+        if (!res.data?.user_message || !res.data?.bot_message) throw new Error('Unexpected response for a message');
         setMessages((prev) => [
           ...prev.map((m) => (m.id === tempId ? { ...res.data.user_message, localPreview } : m)),
           res.data.bot_message,
@@ -200,6 +217,11 @@ export default function ChatPage() {
               <div className="rounded-2xl rounded-tl-md border-2 border-paper-3 bg-paper-2 px-3 py-1.5 dark:border-ink-4 dark:bg-ink-2">
                 <TypingLoader />
               </div>
+              {isSlow && (
+                <p className="self-center font-mono text-xs text-muted" role="status">
+                  Gemini is slow right now, still waiting...
+                </p>
+              )}
             </div>
           )}
           <div ref={endRef} />

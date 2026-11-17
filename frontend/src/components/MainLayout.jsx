@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { CircleAlert, X } from 'lucide-react';
 import { AppSidebar } from './AppSidebar.jsx';
 import Navbar from './Navbar.jsx';
+import ErrorBoundary from './ErrorBoundary.jsx';
 import api, { errorMessage } from '../services/api.js';
 import { groupChatsByDate } from '../lib/utils.js';
 
@@ -20,7 +21,10 @@ export default function MainLayout() {
   const refreshChats = useCallback(() => {
     return api
       .get('chats/')
-      .then((res) => setChats(res.data))
+      .then((res) => {
+        if (!Array.isArray(res.data)) throw new Error('Unexpected response for chats/');
+        setChats(res.data);
+      })
       .catch((err) => setError(errorMessage(err, 'Could not load your chats.')));
   }, []);
 
@@ -37,6 +41,7 @@ export default function MainLayout() {
     async (initialMessage) => {
       try {
         const res = await api.post('chats/');
+        if (!res.data?.id) throw new Error('Unexpected response for a new chat');
         setChats((prev) => [res.data, ...prev]);
         navigate(`/chats/${res.data.id}`, initialMessage ? { state: { initialMessage } } : undefined);
       } catch (err) {
@@ -114,7 +119,10 @@ export default function MainLayout() {
         )}
 
         <main className="min-h-0 flex-1">
-          <Outlet context={{ startChat, refreshChats }} />
+          {/* Keyed by path so an error in one chat clears when you open another. */}
+          <ErrorBoundary key={location.pathname}>
+            <Outlet context={{ startChat, refreshChats }} />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

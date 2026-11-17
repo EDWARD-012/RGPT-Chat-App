@@ -31,7 +31,11 @@ api.interceptors.response.use(
 export function errorMessage(error, fallback = 'Something went wrong. Please try again.') {
   if (error?.response?.data?.error) return error.response.data.error;
   if (error?.response?.status === 413) return 'That file is too large. Images must be 4 MB or smaller.';
-  if (!error?.response) return 'Could not reach the server. Check your connection and try again.';
+  // Vercel answers 504 itself when a function runs past its time limit.
+  if (error?.response?.status === 504 || error?.code === 'ECONNABORTED') {
+    return 'RGPT took too long to reply. Please try again in a minute.';
+  }
+  if (error?.isAxiosError && !error.response) return 'Could not reach the server. Check your connection and try again.';
   return fallback;
 }
 

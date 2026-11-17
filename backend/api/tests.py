@@ -178,7 +178,7 @@ class MessageTests(AuthedTestCase):
 
         prompt = self.gemini.models.generate_content_stream.call_args.kwargs["config"].system_instruction
         self.assertIn("Who is EDWARD7780?", prompt)
-        self.assertIn("Portfolio: https://edward7780.vercel.app", prompt)
+        self.assertIn("Portfolio: https://edward7780.com", prompt)
         # Contact questions get the portfolio link, not personal details.
         self.assertIn("You can reach Ravi through his portfolio", prompt)
         self.assertNotIn("@gmail.com", prompt)

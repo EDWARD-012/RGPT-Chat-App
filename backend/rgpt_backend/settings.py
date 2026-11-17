@@ -35,7 +35,8 @@ SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY") or (
 ALLOWED_HOSTS = [
     "localhost",
     "127.0.0.1",
-    # Production, branch and per-deployment URLs on Vercel.
+    "rgpt.edward7780.com",
+    # Branch and per-deployment URLs on Vercel.
     ".vercel.app",
     *env_list("DJANGO_ALLOWED_HOSTS"),
 ]

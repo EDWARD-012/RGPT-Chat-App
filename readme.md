@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://rgpt-chat-app.vercel.app"><b>Live demo</b></a>
+  <a href="https://rgpt.edward7780.com"><b>Live demo</b></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/EDWARD-012">GitHub</a>
 </p>

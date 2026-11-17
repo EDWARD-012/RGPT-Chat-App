@@ -179,6 +179,10 @@ class MessageTests(AuthedTestCase):
         prompt = self.gemini.models.generate_content_stream.call_args.kwargs["config"].system_instruction
         self.assertIn("Who is EDWARD7780?", prompt)
         self.assertIn("Portfolio: https://edward7780.vercel.app", prompt)
+        # Contact questions get the portfolio link, not personal details.
+        self.assertIn("You can reach Ravi through his portfolio", prompt)
+        self.assertNotIn("@gmail.com", prompt)
+        self.assertNotIn("2005", prompt)
 
     @override_settings(CHAT_HISTORY_LIMIT=3)
     def test_history_window_starts_with_the_user(self):

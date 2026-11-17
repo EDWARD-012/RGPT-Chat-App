@@ -149,7 +149,8 @@ RGPT-Chat-App/
 │   └── rgpt_backend/  Settings and URLs
 ├── docs/screenshots/  Images used in this README
 ├── vercel.json        Vercel Services config
-└── .env.example
+├── .env.example
+└── LICENSE
 ```
 
 ## Contributing
@@ -158,7 +159,7 @@ Pull requests are welcome. For bigger changes, open an issue first so we can tal
 
 ## License
 
-Released under the MIT License.
+Released under the [MIT License](LICENSE).
 
 ---
 

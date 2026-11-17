@@ -1,7 +1,9 @@
 import logging
 import os
 import re
+import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import timedelta
 
 import httpx2
@@ -229,6 +231,18 @@ class GeminiTimeout(Exception):
     """No model answered within GEMINI_TOTAL_TIMEOUT."""
 
 
+# A model that just failed or hung goes to the back of the line for a while,
+# so the next message on this instance starts with one that works.
+SLOW_MODEL_COOLDOWN = 300  # seconds
+_slow_until = {}
+
+
+def models_in_order():
+    models = list(dict.fromkeys([settings.GEMINI_MODEL, *settings.GEMINI_FALLBACK_MODELS]))
+    now = time.monotonic()
+    return sorted(models, key=lambda model: _slow_until.get(model, 0) > now)
+
+
 def gemini_config(timeout):
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_INSTRUCTION,
@@ -239,37 +253,96 @@ def gemini_config(timeout):
     return config
 
 
+def stream_reply(client, model, contents, deadline, started_answering):
+    # Streaming shows when a model starts answering, which tells a stuck model
+    # apart from one that is busy writing a long reply.
+    parts = []
+    stream = client.models.generate_content_stream(
+        model=model, contents=contents, config=gemini_config(deadline - time.monotonic())
+    )
+    for chunk in stream:
+        started_answering.set()
+        if chunk.text:
+            parts.append(chunk.text)
+    return "".join(parts).strip()
+
+
 def generate_reply(contents):
-    """Return (model, reply text), trying the fallback models if the main one is unavailable or too slow."""
-    models = list(dict.fromkeys([settings.GEMINI_MODEL, *settings.GEMINI_FALLBACK_MODELS]))
+    """Return (model, reply text).
+
+    The first model in line gets GEMINI_HEDGE_AFTER seconds to start answering.
+    If it hasn't by then, or it fails, the other models are asked too and the
+    first reply wins.
+    """
+    client = get_gemini_client()
+    waiting = models_in_order()
     deadline = time.monotonic() + settings.GEMINI_TOTAL_TIMEOUT
-    for index, model in enumerate(models):
-        is_last = index == len(models) - 1
-        remaining = deadline - time.monotonic()
-        if remaining < 1:
-            raise GeminiTimeout
-        # The main model gets the most time. After that, the time left is
-        # shared between the models still to try.
-        timeout = min(settings.GEMINI_ATTEMPT_TIMEOUT, remaining) if index == 0 else remaining / (len(models) - index)
-        started = time.monotonic()
-        try:
-            response = get_gemini_client().models.generate_content(
-                model=model, contents=contents, config=gemini_config(timeout)
-            )
-        except genai_errors.APIError as exc:
-            logger.error(
-                "Gemini model %s failed after %.1fs (%s %s): %s",
-                model, time.monotonic() - started, exc.code, exc.status, exc.message,
-            )
-            if exc.code not in FALLBACK_CODES or is_last:
-                raise
-        except httpx2.TransportError as exc:
-            logger.error("Gemini model %s gave no reply after %.1fs: %r", model, time.monotonic() - started, exc)
-            if is_last:
-                raise GeminiTimeout from exc
-        else:
-            logger.info("Gemini model %s replied in %.1fs", model, time.monotonic() - started)
-            return model, (response.text or "").strip()
+    pool = ThreadPoolExecutor(max_workers=len(waiting))
+    running = {}
+    last_error = None
+
+    def start(model):
+        answering = threading.Event()
+        future = pool.submit(stream_reply, client, model, contents, deadline, answering)
+        running[future] = (model, time.monotonic(), answering)
+
+    start(waiting.pop(0))
+    hedge_at = time.monotonic() + settings.GEMINI_HEDGE_AFTER
+    try:
+        while running:
+            now = time.monotonic()
+            if now >= deadline:
+                for model, started, _ in running.values():
+                    logger.error("Gemini model %s gave no reply after %.1fs", model, now - started)
+                    _slow_until[model] = now + SLOW_MODEL_COOLDOWN
+                raise GeminiTimeout
+            someone_answering = any(answering.is_set() for _, _, answering in running.values())
+            if waiting and not someone_answering and now >= hedge_at:
+                logger.info("No reply after %.1fs, also asking %s", settings.GEMINI_HEDGE_AFTER, ", ".join(waiting))
+                while waiting:
+                    start(waiting.pop(0))
+            timeout = deadline - now
+            if waiting and not someone_answering:
+                timeout = min(timeout, hedge_at - now)
+            done, _ = wait(running, timeout=max(timeout, 0), return_when=FIRST_COMPLETED)
+
+            for future in done:
+                model, started, _ = running.pop(future)
+                took = time.monotonic() - started
+                try:
+                    reply = future.result()
+                except genai_errors.APIError as exc:
+                    logger.error(
+                        "Gemini model %s failed after %.1fs (%s %s): %s", model, took, exc.code, exc.status, exc.message
+                    )
+                    if exc.code not in FALLBACK_CODES:
+                        raise
+                    _slow_until[model] = time.monotonic() + SLOW_MODEL_COOLDOWN
+                    last_error = exc
+                except httpx2.TransportError as exc:
+                    logger.error("Gemini model %s gave no reply after %.1fs: %r", model, took, exc)
+                    _slow_until[model] = time.monotonic() + SLOW_MODEL_COOLDOWN
+                    last_error = GeminiTimeout()
+                else:
+                    logger.info("Gemini model %s replied in %.1fs", model, took)
+                    _slow_until.pop(model, None)
+                    # Models that are still silent go to the back of the line.
+                    for other, _, answering in running.values():
+                        if not answering.is_set():
+                            _slow_until[other] = time.monotonic() + SLOW_MODEL_COOLDOWN
+                    return model, reply
+
+            # Everything asked so far has failed: go straight to the next model.
+            if not running and waiting:
+                start(waiting.pop(0))
+                hedge_at = time.monotonic() + settings.GEMINI_HEDGE_AFTER
+    finally:
+        # Don't wait for models that are still running; their replies are no longer needed.
+        pool.shutdown(wait=False, cancel_futures=True)
+
+    if isinstance(last_error, genai_errors.APIError):
+        raise last_error
+    raise GeminiTimeout
 
 
 def make_title(text, upload):

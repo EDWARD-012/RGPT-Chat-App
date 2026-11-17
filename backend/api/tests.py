@@ -1,3 +1,5 @@
+import threading
+import time
 from types import SimpleNamespace
 from unittest import mock
 
@@ -8,6 +10,7 @@ from google.genai import errors as genai_errors
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
+from . import views
 from .models import ChatSession, Message, User
 
 
@@ -117,8 +120,9 @@ class SessionAndUserTests(AuthedTestCase):
         self.assertEqual(self.client.get(f"/api/chats/{chat.id}/").status_code, 404)
 
 
-def gemini_reply(text):
-    return SimpleNamespace(text=text)
+def gemini_reply(*chunks):
+    # generate_content_stream yields chunks; a list can be read more than once.
+    return [SimpleNamespace(text=chunk) for chunk in chunks]
 
 
 def gemini_error(code, status_name):
@@ -139,9 +143,11 @@ class MessageTests(AuthedTestCase):
         patcher = mock.patch("api.views.get_gemini_client")
         self.gemini = patcher.start().return_value
         self.addCleanup(patcher.stop)
+        views._slow_until.clear()
+        self.addCleanup(views._slow_until.clear)
 
     def test_sends_message_and_stores_both_turns(self):
-        self.gemini.models.generate_content.return_value = gemini_reply("Hello from Gemini")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("Hello from Gemini")
         res = self.client.post(self.url, {"text": "Explain recursion"}, format="multipart")
 
         self.assertEqual(res.status_code, 201)
@@ -149,7 +155,7 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(res.data["bot_message"]["text"], "Hello from Gemini")
         self.assertEqual(res.data["chat"]["title"], "Explain recursion")
         self.assertEqual(Message.objects.filter(session=self.chat).count(), 2)
-        self.assertEqual(self.gemini.models.generate_content.call_args.kwargs["model"], "test-model")
+        self.assertEqual(self.gemini.models.generate_content_stream.call_args.kwargs["model"], "test-model")
 
         # A reload reads the same history back.
         detail = self.client.get(f"/api/chats/{self.chat.id}/").data
@@ -158,19 +164,19 @@ class MessageTests(AuthedTestCase):
     def test_earlier_turns_are_sent_as_context(self):
         Message.objects.create(session=self.chat, text="My name is Ravi", is_from_user=True)
         Message.objects.create(session=self.chat, text="Nice to meet you", is_from_user=False)
-        self.gemini.models.generate_content.return_value = gemini_reply("You are Ravi")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("You are Ravi")
         self.client.post(self.url, {"text": "What is my name?"}, format="multipart")
 
-        contents = self.gemini.models.generate_content.call_args.kwargs["contents"]
+        contents = self.gemini.models.generate_content_stream.call_args.kwargs["contents"]
         self.assertEqual([c.role for c in contents], ["user", "model", "user"])
         self.assertEqual(contents[0].parts[0].text, "My name is Ravi")
         self.assertEqual(contents[-1].parts[0].text, "What is my name?")
 
     def test_system_prompt_is_sent(self):
-        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("ok")
         self.client.post(self.url, {"text": "Who is EDWARD7780?"}, format="multipart")
 
-        prompt = self.gemini.models.generate_content.call_args.kwargs["config"].system_instruction
+        prompt = self.gemini.models.generate_content_stream.call_args.kwargs["config"].system_instruction
         self.assertIn("Who is EDWARD7780?", prompt)
         self.assertIn("Portfolio: https://edward7780.vercel.app", prompt)
 
@@ -179,46 +185,46 @@ class MessageTests(AuthedTestCase):
         for i in range(2):
             Message.objects.create(session=self.chat, text=f"question {i}", is_from_user=True)
             Message.objects.create(session=self.chat, text=f"answer {i}", is_from_user=False)
-        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("ok")
         self.client.post(self.url, {"text": "next"}, format="multipart")
 
         # The last 3 messages are answer 0, question 1, answer 1; answer 0 is dropped.
-        contents = self.gemini.models.generate_content.call_args.kwargs["contents"]
+        contents = self.gemini.models.generate_content_stream.call_args.kwargs["contents"]
         self.assertEqual([c.parts[0].text for c in contents], ["question 1", "answer 1", "next"])
 
     def test_image_only_message(self):
-        self.gemini.models.generate_content.return_value = gemini_reply("Nice cat")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("Nice cat")
         image = SimpleUploadedFile("cat.png", b"\x89PNG fake", content_type="image/png")
         res = self.client.post(self.url, {"file_upload": image}, format="multipart")
 
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["user_message"]["attachment"], {"name": "cat.png", "type": "image/png"})
         self.assertEqual(res.data["chat"]["title"], "Image: cat.png")
-        part = self.gemini.models.generate_content.call_args.kwargs["contents"][-1].parts[0]
+        part = self.gemini.models.generate_content_stream.call_args.kwargs["contents"][-1].parts[0]
         self.assertEqual(part.inline_data.mime_type, "image/png")
 
     def test_rejects_non_image_upload(self):
         pdf = SimpleUploadedFile("cv.pdf", b"%PDF", content_type="application/pdf")
         res = self.client.post(self.url, {"file_upload": pdf}, format="multipart")
         self.assertEqual(res.status_code, 400)
-        self.gemini.models.generate_content.assert_not_called()
+        self.gemini.models.generate_content_stream.assert_not_called()
 
     def test_empty_message_rejected(self):
         res = self.client.post(self.url, {"text": "   "}, format="multipart")
         self.assertEqual(res.status_code, 400)
 
     def test_gemini_failure_does_not_store_message(self):
-        self.gemini.models.generate_content.side_effect = gemini_error(429, "RESOURCE_EXHAUSTED")
+        self.gemini.models.generate_content_stream.side_effect = gemini_error(429, "RESOURCE_EXHAUSTED")
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
 
         self.assertEqual(res.status_code, 502)
         self.assertIn("too many requests", res.data["error"])
         self.assertEqual(Message.objects.count(), 0)
         # Both the main and the fallback model were tried.
-        self.assertEqual(self.gemini.models.generate_content.call_count, 2)
+        self.assertEqual(self.gemini.models.generate_content_stream.call_count, 2)
 
     def test_falls_back_when_main_model_is_overloaded(self):
-        self.gemini.models.generate_content.side_effect = [
+        self.gemini.models.generate_content_stream.side_effect = [
             gemini_error(503, "UNAVAILABLE"),
             gemini_reply("Reply from the fallback"),
         ]
@@ -226,12 +232,12 @@ class MessageTests(AuthedTestCase):
 
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["bot_message"]["text"], "Reply from the fallback")
-        models = [c.kwargs["model"] for c in self.gemini.models.generate_content.call_args_list]
+        models = [c.kwargs["model"] for c in self.gemini.models.generate_content_stream.call_args_list]
         self.assertEqual(models, ["test-model", "fallback-model"])
         self.assertEqual(Message.objects.get(is_from_user=False).metadata["model"], "fallback-model")
 
     def test_all_models_overloaded(self):
-        self.gemini.models.generate_content.side_effect = gemini_error(503, "UNAVAILABLE")
+        self.gemini.models.generate_content_stream.side_effect = gemini_error(503, "UNAVAILABLE")
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
 
         self.assertEqual(res.status_code, 502)
@@ -239,7 +245,7 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(Message.objects.count(), 0)
 
     def test_slow_model_falls_back_with_a_timeout(self):
-        self.gemini.models.generate_content.side_effect = [
+        self.gemini.models.generate_content_stream.side_effect = [
             httpx2.ReadTimeout("timed out"),
             gemini_reply("Reply from the fallback"),
         ]
@@ -248,11 +254,49 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(res.status_code, 201)
         self.assertEqual(res.data["bot_message"]["text"], "Reply from the fallback")
         # Every call carries a timeout, so a stuck model can't use up the whole request.
-        timeouts = [c.kwargs["config"].http_options.timeout for c in self.gemini.models.generate_content.call_args_list]
+        timeouts = [c.kwargs["config"].http_options.timeout for c in self.gemini.models.generate_content_stream.call_args_list]
         self.assertTrue(all(t and t <= 48_000 for t in timeouts))
 
+    @override_settings(GEMINI_HEDGE_AFTER=0.05)
+    def test_asks_the_fallback_when_main_model_is_silent(self):
+        release = threading.Event()
+        self.addCleanup(release.set)
+
+        def fake_stream(model, contents, config):
+            if model == "test-model":
+                release.wait(5)
+                return gemini_reply("late")
+            return gemini_reply("fast")
+
+        self.gemini.models.generate_content_stream.side_effect = fake_stream
+        started = time.monotonic()
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["bot_message"]["text"], "fast")
+        self.assertLess(time.monotonic() - started, 2)
+
+        # The silent model goes to the back of the line for the next message.
+        self.gemini.models.generate_content_stream.reset_mock()
+        self.client.post(self.url, {"text": "again"}, format="multipart")
+        first = self.gemini.models.generate_content_stream.call_args_list[0].kwargs["model"]
+        self.assertEqual(first, "fallback-model")
+
+    @override_settings(GEMINI_HEDGE_AFTER=0.05)
+    def test_waits_for_a_model_that_is_answering(self):
+        def slow_but_answering(model, contents, config):
+            yield SimpleNamespace(text="Part one, ")
+            time.sleep(0.3)
+            yield SimpleNamespace(text="part two.")
+
+        self.gemini.models.generate_content_stream.side_effect = slow_but_answering
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.data["bot_message"]["text"], "Part one, part two.")
+        self.assertEqual(self.gemini.models.generate_content_stream.call_count, 1)
+
     def test_no_model_answers_in_time(self):
-        self.gemini.models.generate_content.side_effect = httpx2.ReadTimeout("timed out")
+        self.gemini.models.generate_content_stream.side_effect = httpx2.ReadTimeout("timed out")
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
 
         self.assertEqual(res.status_code, 504)
@@ -261,26 +305,26 @@ class MessageTests(AuthedTestCase):
 
     @override_settings(GEMINI_THINKING_LEVEL="LOW")
     def test_optional_thinking_level(self):
-        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("ok")
         self.client.post(self.url, {"text": "hi"}, format="multipart")
-        config = self.gemini.models.generate_content.call_args.kwargs["config"]
+        config = self.gemini.models.generate_content_stream.call_args.kwargs["config"]
         self.assertEqual(config.thinking_config.thinking_level, "LOW")
 
     def test_bad_request_does_not_try_fallback(self):
-        self.gemini.models.generate_content.side_effect = gemini_error(400, "INVALID_ARGUMENT")
+        self.gemini.models.generate_content_stream.side_effect = gemini_error(400, "INVALID_ARGUMENT")
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
 
         self.assertEqual(res.status_code, 502)
-        self.assertEqual(self.gemini.models.generate_content.call_count, 1)
+        self.assertEqual(self.gemini.models.generate_content_stream.call_count, 1)
 
     def test_empty_gemini_reply_gets_fallback_text(self):
-        self.gemini.models.generate_content.return_value = gemini_reply(None)
+        self.gemini.models.generate_content_stream.return_value = gemini_reply(None)
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
         self.assertEqual(res.status_code, 201)
         self.assertTrue(res.data["bot_message"]["text"])
 
     def test_hourly_limit(self):
-        self.gemini.models.generate_content.return_value = gemini_reply("ok")
+        self.gemini.models.generate_content_stream.return_value = gemini_reply("ok")
         for _ in range(5):
             self.assertEqual(self.client.post(self.url, {"text": "x"}, format="multipart").status_code, 201)
         res = self.client.post(self.url, {"text": "x"}, format="multipart")

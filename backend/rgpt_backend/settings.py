@@ -163,13 +163,13 @@ GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID") or os.environ.get("VITE_GO
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
-# Tried in order when the main model is rate limited or overloaded.
+# Also asked when the main model is slow, rate limited or overloaded.
 GEMINI_FALLBACK_MODELS = env_list("GEMINI_FALLBACK_MODELS") or ["gemini-3.6-flash", "gemini-3.5-flash-lite"]
-# The SDK waits forever by default, and a stuck call used to run into Vercel's
-# 60 second function limit before the fallback models were tried. Each model
-# now gets GEMINI_ATTEMPT_TIMEOUT seconds and all of them together get
-# GEMINI_TOTAL_TIMEOUT, which leaves room for the rest of the request.
-GEMINI_ATTEMPT_TIMEOUT = float(os.environ.get("GEMINI_ATTEMPT_TIMEOUT", "25"))
+# If the first model hasn't started answering after this many seconds, the
+# fallbacks are asked too and the first reply wins.
+GEMINI_HEDGE_AFTER = float(os.environ.get("GEMINI_HEDGE_AFTER", "5"))
+# The SDK waits forever by default. Stop waiting for Gemini after this many
+# seconds, well inside Vercel's 60 second function limit.
 GEMINI_TOTAL_TIMEOUT = float(os.environ.get("GEMINI_TOTAL_TIMEOUT", "48"))
 # Optional, e.g. LOW or MINIMAL for faster replies on models that support it.
 GEMINI_THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "").strip().upper() or None

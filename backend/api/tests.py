@@ -111,7 +111,16 @@ def gemini_reply(text):
     return SimpleNamespace(text=text)
 
 
-@override_settings(GEMINI_API_KEY="test-key", GEMINI_MODEL="test-model", MESSAGES_PER_HOUR=5)
+def gemini_error(code, status_name):
+    return genai_errors.APIError(code, {"error": {"code": code, "status": status_name, "message": status_name}})
+
+
+@override_settings(
+    GEMINI_API_KEY="test-key",
+    GEMINI_MODEL="test-model",
+    GEMINI_FALLBACK_MODELS=["fallback-model"],
+    MESSAGES_PER_HOUR=5,
+)
 class MessageTests(AuthedTestCase):
     def setUp(self):
         super().setUp()
@@ -169,14 +178,42 @@ class MessageTests(AuthedTestCase):
         self.assertEqual(res.status_code, 400)
 
     def test_gemini_failure_does_not_store_message(self):
-        self.gemini.models.generate_content.side_effect = genai_errors.APIError(
-            429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "quota"}}
-        )
+        self.gemini.models.generate_content.side_effect = gemini_error(429, "RESOURCE_EXHAUSTED")
         res = self.client.post(self.url, {"text": "hi"}, format="multipart")
 
         self.assertEqual(res.status_code, 502)
         self.assertIn("too many requests", res.data["error"])
         self.assertEqual(Message.objects.count(), 0)
+        # Both the main and the fallback model were tried.
+        self.assertEqual(self.gemini.models.generate_content.call_count, 2)
+
+    def test_falls_back_when_main_model_is_overloaded(self):
+        self.gemini.models.generate_content.side_effect = [
+            gemini_error(503, "UNAVAILABLE"),
+            gemini_reply("Reply from the fallback"),
+        ]
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(res.data["bot_message"]["text"], "Reply from the fallback")
+        models = [c.kwargs["model"] for c in self.gemini.models.generate_content.call_args_list]
+        self.assertEqual(models, ["test-model", "fallback-model"])
+        self.assertEqual(Message.objects.get(is_from_user=False).metadata["model"], "fallback-model")
+
+    def test_all_models_overloaded(self):
+        self.gemini.models.generate_content.side_effect = gemini_error(503, "UNAVAILABLE")
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 502)
+        self.assertIn("busy", res.data["error"])
+        self.assertEqual(Message.objects.count(), 0)
+
+    def test_bad_request_does_not_try_fallback(self):
+        self.gemini.models.generate_content.side_effect = gemini_error(400, "INVALID_ARGUMENT")
+        res = self.client.post(self.url, {"text": "hi"}, format="multipart")
+
+        self.assertEqual(res.status_code, 502)
+        self.assertEqual(self.gemini.models.generate_content.call_count, 1)
 
     def test_empty_gemini_reply_gets_fallback_text(self):
         self.gemini.models.generate_content.return_value = gemini_reply(None)

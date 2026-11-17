@@ -205,6 +205,29 @@ def message_to_content(message):
     )
 
 
+# Errors where another model may still answer: rate limits are per model, and
+# 5xx usually means the model is overloaded ("high demand") for a while.
+FALLBACK_CODES = {429, 500, 502, 503, 504}
+OVERLOADED_CODES = {500, 502, 503, 504}
+
+
+def generate_reply(contents):
+    """Return (model, reply text), trying the fallback models if the main one is unavailable."""
+    models = list(dict.fromkeys([settings.GEMINI_MODEL, *settings.GEMINI_FALLBACK_MODELS]))
+    for index, model in enumerate(models):
+        try:
+            response = get_gemini_client().models.generate_content(
+                model=model,
+                contents=contents,
+                config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
+            )
+            return model, (response.text or "").strip()
+        except genai_errors.APIError as exc:
+            logger.error("Gemini model %s failed (%s %s): %s", model, exc.code, exc.status, exc.message)
+            if exc.code not in FALLBACK_CODES or index == len(models) - 1:
+                raise
+
+
 def make_title(text, upload):
     if text:
         title = re.sub(r"\s+", " ", text).strip()
@@ -264,16 +287,12 @@ class MessageListCreateView(generics.ListCreateAPIView):
         contents.append(types.Content(role="user", parts=parts))
 
         try:
-            response = get_gemini_client().models.generate_content(
-                model=settings.GEMINI_MODEL,
-                contents=contents,
-                config=types.GenerateContentConfig(system_instruction=SYSTEM_INSTRUCTION),
-            )
-            reply = (response.text or "").strip()
+            model, reply = generate_reply(contents)
         except genai_errors.APIError as exc:
-            logger.error("Gemini request failed (%s %s): %s", exc.code, exc.status, exc.message)
             if exc.code == 429:
                 message = "RGPT is getting too many requests right now. Please try again in a minute."
+            elif exc.code in OVERLOADED_CODES:
+                message = "Gemini is busy right now. Please try again in a minute."
             else:
                 message = "RGPT couldn't get a reply from Gemini. Please try again."
             return error(message, status.HTTP_502_BAD_GATEWAY)
@@ -294,7 +313,7 @@ class MessageListCreateView(generics.ListCreateAPIView):
                 session=session,
                 text=reply or EMPTY_REPLY,
                 is_from_user=False,
-                metadata={"model": settings.GEMINI_MODEL},
+                metadata={"model": model},
             )
             if not session.title or session.title == DEFAULT_CHAT_TITLE:
                 session.title = make_title(text, upload)
